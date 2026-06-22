@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "provenance.schema.json",
+  "title": "SAS Lineage Provenance",
+  "description": "Canonical parser output — column-level provenance from a SAS DI Studio estate",
+  "type": "object",
+  "required": ["meta", "tables", "columns", "jobs", "lineage_chain", "quality_rules", "flags", "reconciliation"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["generated_at", "parser_version", "estate", "job_count", "flow_count"],
+      "properties": {
+        "generated_at": { "type": "string", "format": "date-time" },
+        "parser_version": { "type": "string" },
+        "estate": { "type": "string" },
+        "job_count": { "type": "integer", "minimum": 0 },
+        "flow_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "libref", "engine", "path", "layer", "is_remote"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^tbl_[0-9a-f]{12}$" },
+          "name": { "type": "string" },
+          "libref": { "type": "string" },
+          "engine": { "type": "string" },
+          "path": { "type": "string" },
+          "layer": { "type": "string", "enum": ["RAW", "ODS", "STG", "MART"] },
+          "is_remote": { "type": "boolean" }
+        }
+      }
+    },
+    "columns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "table_id", "name", "layer", "data_type", "nullable"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^col_[0-9a-f]{12}$" },
+          "table_id": { "type": "string" },
+          "name": { "type": "string" },
+          "layer": { "type": "string", "enum": ["RAW", "ODS", "STG", "MART"] },
+          "data_type": { "type": "string" },
+          "nullable": { "type": "boolean" }
+        }
+      }
+    },
+    "jobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "flow_id", "frequency", "frequency_evidence", "owner", "domain"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^job_[0-9a-f]{12}$" },
+          "name": { "type": "string" },
+          "flow_id": { "type": ["string", "null"] },
+          "frequency": { "type": ["string", "null"], "enum": ["daily", "weekly", "monthly", "quarterly", "annual", null] },
+          "frequency_evidence": { "type": "array", "items": { "type": "string" } },
+          "owner": { "type": ["string", "null"] },
+          "domain": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "lineage_chain": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "mart_column_id", "source_column_id", "chain_order", "job_id", "step_name", "step_type", "transformation_logic", "data_type_at_step", "nullable_at_step", "unmappable_reason"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^lc_[0-9a-f]{12}$" },
+          "mart_column_id": { "type": "string" },
+          "source_column_id": { "type": "string" },
+          "chain_order": { "type": "integer", "minimum": 1 },
+          "job_id": { "type": "string" },
+          "step_name": { "type": "string" },
+          "step_type": { "type": "string", "enum": ["DATA", "PROC_SQL", "PROC_FORMAT", "PROC_SORT", "SCD2", "RSUBMIT", "OTHER"] },
+          "transformation_logic": { "type": "string" },
+          "data_type_at_step": { "type": ["string", "null"] },
+          "nullable_at_step": { "type": ["boolean", "null"] },
+          "unmappable_reason": { "type": ["string", "null"], "enum": ["macro_unresolved", "dynamic_column_name", "hand_written_code", "remote_execution", "step_count_mismatch", null] }
+        }
+      }
+    },
+    "quality_rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "job_id", "rule_name", "rule_definition", "applies_to_column_id"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^qr_[0-9a-f]{12}$" },
+          "job_id": { "type": "string" },
+          "rule_name": { "type": "string" },
+          "rule_definition": { "type": "string" },
+          "applies_to_column_id": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref_id", "reason", "context", "snippet"],
+        "properties": {
+          "ref_id": { "type": "string" },
+          "reason": { "type": "string", "enum": ["macro_unresolved", "dynamic_column_name", "hand_written_code", "remote_execution", "step_count_mismatch"] },
+          "context": { "type": "string" },
+          "snippet": { "type": "string" }
+        }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "required": ["excel_supplied", "matches", "mismatches", "parser_only", "excel_only"],
+      "properties": {
+        "excel_supplied": { "type": "boolean" },
+        "matches": { "type": "integer", "minimum": 0 },
+        "mismatches": { "type": "array" },
+        "parser_only": { "type": "array", "items": { "type": "string" } },
+        "excel_only": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

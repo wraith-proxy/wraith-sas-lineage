@@ -1,0 +1,59 @@
+name: Deploy Gitea Pages
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run Tests & Coverage
+        run: uv run pytest --cov=src --cov-report=xml
+
+      - name: Generate Coverage Badge
+        run: uv run genbadge coverage -i coverage.xml -o docs/coverage.svg
+
+      - name: Build Documentation
+        run: uv run mkdocs build
+
+      - name: Sync to Main Website Repo
+        env:
+          MY_TOKEN: ${{ secrets.GITEATOKEN }}
+          MY_URL: ${{ secrets.GITEAURL }}
+
+        run: |
+          # 1. Clone your main website repo
+          CLEAN_URL=${MY_URL#*//}
+          git clone https://${MY_TOKEN}@${CLEAN_URL}/thomaspeoples/ghost-site.git main_site
+
+          # 2. Create the target directory if it doesn't exist
+          TARGET_DIR="main_site/www/gitea-repos/wraith-sas-lineage"
+          mkdir -p $TARGET_DIR
+
+          # 3. Clean and Copy
+          rm -rf $TARGET_DIR/*
+          cp -r site/* $TARGET_DIR/
+
+          # 4. Commit and Push to the OTHER repo
+          cd main_site
+          git config user.name "Ghost Runner"
+          git config user.email "runner@ghost-stack.local"
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to documentation. Skipping commit."
+          else
+            git commit -m ":books: main: Update docs for wraith-sas-lineage: ${{ gitea.sha }}"
+            git push origin main
+          fi

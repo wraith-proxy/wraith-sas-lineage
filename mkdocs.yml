@@ -1,0 +1,45 @@
+site_name: wraith-sas-lineage
+site_description: SAS Lineage Extraction for the Ghost Stack
+site_author: Thomas Peoples
+repo_url: https://git.thomaspeoples.com/thomaspeoples/wraith-sas-lineage
+edit_uri: edit/main/docs/
+site_url: https://www.thomaspeoples.com/gitea-repos/wraith-sas-lineage/
+use_directory_urls: true
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: teal
+      accent: cyan
+  features:
+    - navigation.tabs
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - Architecture: architecture.md
+  - Technical Reference: reference.md
+  - API Reference: api.md
+  - Security Statement: security.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: ["."]
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+
+extra:
+  links:
+    - icon: material/home
+      link: https://www.thomaspeoples.com/
+      name: Back to Main Site
