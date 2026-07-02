@@ -4,7 +4,7 @@
   "title": "SAS Lineage Provenance",
   "description": "Canonical parser output — column-level provenance from a SAS DI Studio estate",
   "type": "object",
-  "required": ["meta", "tables", "columns", "jobs", "lineage_chain", "quality_rules", "flags", "reconciliation"],
+  "required": ["meta", "tables", "columns", "jobs", "lineage_chain", "table_lineage", "quality_rules", "flags", "reconciliation"],
   "properties": {
     "meta": {
       "type": "object",
@@ -21,7 +21,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "libref", "engine", "path", "layer", "is_remote"],
+        "required": ["id", "name", "libref", "engine", "path", "layer", "is_remote", "meta_id", "is_intermediate"],
         "properties": {
           "id": { "type": "string", "pattern": "^tbl_[0-9a-f]{12}$" },
           "name": { "type": "string" },
@@ -29,7 +29,9 @@
           "engine": { "type": "string" },
           "path": { "type": "string" },
           "layer": { "type": "string", "enum": ["RAW", "ODS", "STG", "MART"] },
-          "is_remote": { "type": "boolean" }
+          "is_remote": { "type": "boolean" },
+          "meta_id": { "type": ["string", "null"] },
+          "is_intermediate": { "type": "boolean" }
         }
       }
     },
@@ -68,7 +70,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "mart_column_id", "source_column_id", "chain_order", "job_id", "step_name", "step_type", "transformation_logic", "data_type_at_step", "nullable_at_step", "unmappable_reason"],
+        "required": ["id", "mart_column_id", "source_column_id", "chain_order", "job_id", "step_name", "step_type", "transformation_logic", "data_type_at_step", "nullable_at_step", "unmappable_reason", "evidence"],
         "properties": {
           "id": { "type": "string", "pattern": "^lc_[0-9a-f]{12}$" },
           "mart_column_id": { "type": "string" },
@@ -80,7 +82,24 @@
           "transformation_logic": { "type": "string" },
           "data_type_at_step": { "type": ["string", "null"] },
           "nullable_at_step": { "type": ["boolean", "null"] },
-          "unmappable_reason": { "type": ["string", "null"], "enum": ["macro_unresolved", "dynamic_column_name", "hand_written_code", "remote_execution", "step_count_mismatch", null] }
+          "unmappable_reason": { "type": ["string", "null"], "enum": ["macro_unresolved", "dynamic_column_name", "hand_written_code", "remote_execution", "step_count_mismatch", "multi_source", null] },
+          "evidence": { "type": ["string", "null"], "enum": ["metadata_macro", "parsed_sql", "log_confirmed", null] }
+        }
+      }
+    },
+    "table_lineage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "source_table_id", "target_table_id", "job_id", "step_name", "transform_type", "evidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^tl_[0-9a-f]{12}$" },
+          "source_table_id": { "type": "string" },
+          "target_table_id": { "type": "string" },
+          "job_id": { "type": "string" },
+          "step_name": { "type": "string" },
+          "transform_type": { "type": "string" },
+          "evidence": { "type": ["string", "null"], "enum": ["metadata_macro", "parsed_sql", "log_confirmed", null] }
         }
       }
     },
@@ -105,7 +124,7 @@
         "required": ["ref_id", "reason", "context", "snippet"],
         "properties": {
           "ref_id": { "type": "string" },
-          "reason": { "type": "string", "enum": ["macro_unresolved", "dynamic_column_name", "hand_written_code", "remote_execution", "step_count_mismatch"] },
+          "reason": { "type": "string", "enum": ["macro_unresolved", "dynamic_column_name", "hand_written_code", "remote_execution", "step_count_mismatch", "multi_source"] },
           "context": { "type": "string" },
           "snippet": { "type": "string" }
         }

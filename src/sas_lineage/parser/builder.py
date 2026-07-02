@@ -2,7 +2,7 @@
 ProvenanceBuilder: orchestrates Walker + extractors → Provenance.
 
 Usage:
-    builder = ProvenanceBuilder(code_dir, log_dir, estate="acme-risk")
+    builder = ProvenanceBuilder(code_dir, log_dir, estate="acme-sales")
     provenance = builder.build()
     provenance.to_json()
 """
@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import datetime
+import re
 from pathlib import Path
 
 from sas_lineage import __version__
@@ -21,6 +22,7 @@ from sas_lineage.ids import (
 )
 from sas_lineage.models import (
     Column,
+    Evidence,
     Flag,
     Job,
     LineageChain,
@@ -29,9 +31,11 @@ from sas_lineage.models import (
     QualityRule,
     ReconciliationResult,
     Table,
+    TableLineage,
     UnmappableReason,
 )
 from sas_lineage.parser import patterns
+from sas_lineage.parser.di_headers import harvest_di_headers
 from sas_lineage.parser.extractor import StepExtractor
 from sas_lineage.parser.log_resolver import LogResolver
 from sas_lineage.parser.walker import walk_pairs
@@ -55,8 +59,10 @@ class ProvenanceBuilder:
         self._columns: dict[str, Column] = {}
         self._jobs: dict[str, Job] = {}
         self._edges: list[LineageChain] = []
+        self._table_edges: list[TableLineage] = []
         self._quality_rules: list[QualityRule] = []
         self._flags: list[Flag] = []
+        self.row_counts: dict[str, int] = {}
 
     def register(self, extractor: StepExtractor) -> None:
         self._extractors.append(extractor)
@@ -72,15 +78,18 @@ class ProvenanceBuilder:
             self._jobs[job.id] = job
             if job.flow_id:
                 flow_ids.add(job.flow_id)
+            self._harvest_headers(code, job.id)
             self._extract_from_job(code, resolver, job.id)
+            self.row_counts.update(resolver.row_counts())
             self._check_step_count(job.id, code, resolver)
 
         self._resolve_librefs()
+        self._classify_intermediates()
 
         return Provenance(
             meta=ProvenanceMeta(
                 generated_at=datetime.datetime.now(
-                    tz=datetime.timezone.utc
+                    tz=datetime.UTC
                 ).isoformat(),
                 parser_version=__version__,
                 estate=self.estate,
@@ -91,6 +100,7 @@ class ProvenanceBuilder:
             columns=list(self._columns.values()),
             jobs=list(self._jobs.values()),
             lineage_chain=_stitch_chains(self._edges),
+            table_lineage=self._table_edges,
             quality_rules=self._quality_rules,
             flags=self._flags,
             reconciliation=ReconciliationResult(),
@@ -126,6 +136,12 @@ class ProvenanceBuilder:
         self._tables = {
             tid: t for tid, t in self._tables.items() if t.name != t.libref
         }
+
+    def _classify_intermediates(self) -> None:
+        """DI stages through work.W*-prefixed temp views: mark them."""
+        for t in self._tables.values():
+            if t.libref.upper() == "WORK" and t.name.upper().startswith("W"):
+                t.is_intermediate = True
 
     def _build_job(self, name: str, code: str, resolver: LogResolver) -> Job:
         from sas_lineage.models import Frequency
@@ -171,8 +187,37 @@ class ProvenanceBuilder:
                 )
             )
 
+    def _harvest_headers(self, code: str, job_id: str) -> None:
+        """DI boxed-header pre-pass on RAW code (headers are comments)."""
+        harvest = harvest_di_headers(code, job_id)
+        for t in harvest.tables:
+            existing = self._tables.setdefault(t.id, t)
+            if existing.meta_id is None:
+                existing.meta_id = t.meta_id
+        for c in harvest.columns:
+            self._columns.setdefault(c.id, c)
+        self._table_edges.extend(harvest.table_edges)
+        self._edges.extend(harvest.column_edges)
+        self._flags.extend(harvest.flags)
+
     def _extract_from_job(
         self, code: str, resolver: LogResolver, job_id: str
+    ) -> None:
+        self._extract_blocks(code, resolver, job_id, self._edges, True)
+
+        executed = resolver.executed_code()
+        if executed:
+            log_edges: list[LineageChain] = []
+            self._extract_blocks(executed, resolver, job_id, log_edges, False)
+            self._merge_log_edges(log_edges)
+
+    def _extract_blocks(
+        self,
+        code: str,
+        resolver: LogResolver,
+        job_id: str,
+        edge_sink: list[LineageChain],
+        keep_flags: bool,
     ) -> None:
         blocks = _split_into_blocks(code)
         for step_name, block in blocks:
@@ -189,8 +234,41 @@ class ProvenanceBuilder:
                             if logged:
                                 c.data_type = logged
                         self._columns.setdefault(c.id, c)
-                    self._edges.extend(lineage)
-                    self._flags.extend(flags)
+                    edge_sink.extend(lineage)
+                    if keep_flags:
+                        self._flags.extend(flags)
+
+    def _merge_log_edges(self, log_edges: list[LineageChain]) -> None:
+        """Reconcile MPRINT-derived hops against code-derived ones.
+
+        A hop seen in both is confirmed executed; a hop only the log saw
+        (code inside user-written macros the static parse cannot open) is
+        appended as a log-only edge. Code-only hops keep their static
+        evidence — the intended-vs-executed report surfaces them.
+        """
+        by_key = {
+            (e.mart_column_id, e.source_column_id): e for e in self._edges
+        }
+        for le in log_edges:
+            key = (le.mart_column_id, le.source_column_id)
+            found = by_key.get(key)
+            if found is not None:
+                found.evidence = Evidence.LOG_CONFIRMED
+            else:
+                le.evidence = Evidence.LOG_CONFIRMED
+                by_key[key] = le
+                self._edges.append(le)
+                self._flags.append(
+                    Flag(
+                        ref_id=le.id,
+                        reason=UnmappableReason.HAND_WRITTEN_CODE,
+                        context=(
+                            "log-only edge: executed but absent from "
+                            "static parse"
+                        ),
+                        snippet=le.transformation_logic[:200],
+                    )
+                )
 
 
 def _stitch_chains(edges: list[LineageChain]) -> list[LineageChain]:
@@ -232,6 +310,7 @@ def _stitch_chains(edges: list[LineageChain]) -> list[LineageChain]:
                     step_type=e.step_type,
                     transformation_logic=e.transformation_logic,
                     unmappable_reason=e.unmappable_reason,
+                    evidence=e.evidence,
                 )
                 stack.append((e.source_column_id, order + 1))
 
@@ -260,6 +339,70 @@ def _strip_comments(code: str) -> str:
     return "".join(kept)
 
 
+def _mask_strings(code: str) -> str:
+    """Blank out string-literal contents, preserving length and newlines.
+
+    Offsets in the masked text align 1:1 with the input, so matches found
+    on the mask can slice the original. Doubled quotes ('' / "") are the
+    SAS escape and stay inside the literal.
+    """
+    out = list(code)
+    i, n = 0, len(code)
+    while i < n:
+        quote = code[i]
+        if quote in "'\"":
+            i += 1
+            while i < n:
+                if code[i] == quote:
+                    if i + 1 < n and code[i + 1] == quote:
+                        out[i] = out[i + 1] = "x"
+                        i += 2
+                        continue
+                    break
+                if code[i] not in "\r\n":
+                    out[i] = "x"
+                i += 1
+        i += 1
+    return "".join(out)
+
+
+_DATALINES_STMT = re.compile(
+    r"^\s*(datalines4|cards4|datalines|cards)\s*;\s*$",
+    re.IGNORECASE,
+)
+
+
+def _mask_datalines(code: str) -> str:
+    """Blank out datalines/cards bodies, preserving length and newlines.
+
+    A *4 block ends at the ';;;;' line; the others end at the first line
+    containing a semicolon (SAS's own rule — a missing terminator means
+    the next 'run;' line closes the block). Terminator lines stay
+    unmasked so block-terminator regexes still see them.
+    """
+    lines = code.splitlines(keepends=True)
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        m = _DATALINES_STMT.match(line)
+        if m:
+            four = m.group(1).lower().endswith("4")
+            i += 1
+            while i < len(lines):
+                body = lines[i]
+                if (four and body.lstrip().startswith(";;;;")) or (
+                    not four and ";" in body
+                ):
+                    out.append(body)
+                    break
+                out.append("".join(c if c in "\r\n" else " " for c in body))
+                i += 1
+        i += 1
+    return "".join(out)
+
+
 def _split_into_blocks(code: str) -> list[tuple[str, str]]:
     """
     Split SAS source into (step_name, block) pairs.
@@ -267,17 +410,27 @@ def _split_into_blocks(code: str) -> list[tuple[str, str]]:
     DATA/PROC terminate at RUN/QUIT. RSUBMIT terminates at ENDRSUBMIT.
     %MACRO terminates at %MEND. Global statements (LIBNAME, %LET, OPTIONS)
     are collected into globals_N blocks so extractors still see them.
+
+    Starters/terminators are matched on a masked copy (string literals and
+    datalines bodies blanked) so quoted 'run;' or SAS keywords inside data
+    rows cannot open or close a block; slices come from the clean text.
     """
     import re as _re
 
     clean = _strip_comments(code)
+    masked = _mask_datalines(_mask_strings(clean))
 
+    # (?<=;) lets a statement open/close mid-line after a semicolon; safe
+    # only because strings and datalines are masked. `data\s+(?!=)` keeps
+    # assignments to a variable named `data` from opening a step.
     _STARTERS = _re.compile(
-        r"^\s*(?:data\s+\S|\bproc\s+\w+|\brsubmit\b|%macro\s+\w+)",
+        r"(?:^|(?<=;))\s*"
+        r"(?:data\s+(?!=)\S|\bproc\s+\w+|\brsubmit\b|%macro\s+\w+)",
         _re.IGNORECASE | _re.MULTILINE,
     )
     _TERM_RUNQUIT = _re.compile(
-        r"^\s*(?:run|quit)\s*;", _re.IGNORECASE | _re.MULTILINE
+        r"(?:^|(?<=;))\s*(?:run|quit)\s*;",
+        _re.IGNORECASE | _re.MULTILINE,
     )
     _TERM_ENDRSUBMIT = _re.compile(
         r"^\s*endrsubmit\s*;", _re.IGNORECASE | _re.MULTILINE
@@ -293,7 +446,7 @@ def _split_into_blocks(code: str) -> list[tuple[str, str]]:
     n = len(clean)
 
     while pos < n:
-        m_start = _STARTERS.search(clean, pos)
+        m_start = _STARTERS.search(masked, pos)
         if m_start is None:
             tail = clean[pos:].strip()
             if tail:
@@ -309,28 +462,42 @@ def _split_into_blocks(code: str) -> list[tuple[str, str]]:
             step_num += 1
 
         raw = m_start.group(0).strip().lower()
+        # DATA/PROC also end implicitly at the next step boundary;
+        # RSUBMIT/%MACRO have explicit end tokens and legally nest steps.
+        implicit_end = True
         if raw.startswith("data"):
             step_name = f"data_{step_num}"
             terminator = _TERM_RUNQUIT
         elif raw.startswith("rsubmit"):
             step_name = f"rsubmit_{step_num}"
             terminator = _TERM_ENDRSUBMIT
+            implicit_end = False
         elif raw.startswith("%macro"):
             m_mac = patterns.MACRO_DEF.match(raw)
             mac = m_mac.group(1) if m_mac else "anon"
             step_name = f"macro_{mac}_{step_num}"
             terminator = _TERM_MEND
+            implicit_end = False
         else:
             m_proc = _re.match(r"proc\s+(\w+)", raw, _re.IGNORECASE)
             ptype = m_proc.group(1).upper() if m_proc else "UNKNOWN"
             step_name = f"{ptype}_{step_num}"
             # PROC SQL ends with QUIT; other PROCs end with RUN; accept both
-            terminator = _re.compile(
-                r"^\s*(?:run|quit)\s*;", _re.IGNORECASE | _re.MULTILINE
-            )
+            terminator = _TERM_RUNQUIT
 
-        m_end = terminator.search(clean, start_pos)
-        if m_end is None:
+        m_end = terminator.search(masked, start_pos)
+        m_next = (
+            _STARTERS.search(masked, m_start.end()) if implicit_end else None
+        )
+        if m_next is not None and (
+            m_end is None or m_next.start() < m_end.start()
+        ):
+            end_pos = m_next.start()
+            blocks.append((step_name, clean[start_pos:end_pos]))
+            pos = end_pos
+            global_start = end_pos
+            step_num += 1
+        elif m_end is None:
             blocks.append((step_name, clean[start_pos:]))
             pos = n
             global_start = n

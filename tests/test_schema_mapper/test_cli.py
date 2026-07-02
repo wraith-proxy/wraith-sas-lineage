@@ -19,7 +19,7 @@ _PROVENANCE = {
         {
             "id": "tbl_aabbccddeeff",
             "name": "ALL_EMP",
-            "libref": "RISKODS",
+            "libref": "SALESODS",
             "engine": "BASE",
             "path": "/data/ods",
             "layer": "ODS",
@@ -30,7 +30,7 @@ _PROVENANCE = {
     "jobs": [
         {
             "id": "job_aabb",
-            "name": "RISK_LOAD",
+            "name": "SALES_LOAD",
             "flow_id": None,
             "frequency": "daily",
             "frequency_evidence": [],

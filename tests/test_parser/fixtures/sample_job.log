@@ -1,10 +1,10 @@
 NOTE: SAS (r) Proprietary Software Release 9.4  TS1M7
 NOTE: Running on Linux.
 
-1    libname RISKODS BASE '/data/ods/risk';
-NOTE: Libref RISKODS was successfully assigned as follows:
+1    libname SALESODS BASE '/data/ods/sales';
+NOTE: Libref SALESODS was successfully assigned as follows:
       Engine:        BASE
-      Physical Name: /data/ods/risk
+      Physical Name: /data/ods/sales
 
 2    %let run_dt = 20260620;
 SYMBOLGEN:  Macro variable RUN_DT resolves to 20260620
@@ -14,12 +14,12 @@ NOTE: PROCEDURE SQL used (Total process time):
       real time           0.12 seconds
       cpu time            0.10 seconds
 
-NOTE: Table RISKODS.ALL_EMP created, with 42500 rows and 4 columns.
+NOTE: Table SALESODS.ALL_EMP created, with 42500 rows and 4 columns.
 
-4    data RISKODS.ALL_EMP_CLEAN;
+4    data SALESODS.ALL_EMP_CLEAN;
 NOTE: DATA statement used (Total process time):
       real time           0.08 seconds
       cpu time            0.07 seconds
 
-NOTE: There were 42500 observations read from the data set RISKODS.ALL_EMP.
-NOTE: The data set RISKODS.ALL_EMP_CLEAN has 42500 observations and 4 variables.
+NOTE: There were 42500 observations read from the data set SALESODS.ALL_EMP.
+NOTE: The data set SALESODS.ALL_EMP_CLEAN has 42500 observations and 4 variables.

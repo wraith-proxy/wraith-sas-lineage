@@ -20,15 +20,15 @@ class TestLibnameExtractor:
     ex = LibnameExtractor()
 
     def test_can_extract_true(self):
-        assert self.ex.can_extract("libname RISKODS BASE '/data';")
+        assert self.ex.can_extract("libname SALESODS BASE '/data';")
 
     def test_can_extract_false(self):
         assert not self.ex.can_extract("data x; set y; run;")
 
     def test_extracts_base_libname(self):
-        code = "libname RISKODS BASE '/data/ods/risk';"
+        code = "libname SALESODS BASE '/data/ods/sales';"
         tables, cols, lc, flags = self.ex.extract(code, _NO_LOG, "j1", "s1")
-        assert any(t.libref == "RISKODS" for t in tables)
+        assert any(t.libref == "SALESODS" for t in tables)
         assert len(flags) == 0
 
     def test_extracts_path(self):
@@ -37,12 +37,12 @@ class TestLibnameExtractor:
         assert tables[0].path == "/some/path"
 
     def test_detects_db2_engine(self):
-        code = "libname DB2LIB DB2 schema=RISK database=PR01;"
+        code = "libname DB2LIB DB2 schema=SALES database=PR01;"
         tables, *_ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         assert tables[0].engine == "DB2"
 
     def test_detects_remote(self):
-        code = "libname RLIB slibref=RISKODS server=PROD;"
+        code = "libname RLIB slibref=SALESODS server=PROD;"
         tables, *_ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         assert tables[0].is_remote
 
@@ -52,7 +52,7 @@ class TestLibnameExtractor:
         assert tables == []
 
     def test_layer_inferred_ods(self):
-        code = "libname RISKODS BASE '/data/ods';"
+        code = "libname SALESODS BASE '/data/ods';"
         tables, *_ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         assert tables[0].layer.value == "ODS"
 
@@ -72,7 +72,7 @@ class TestDataStepExtractor:
         assert not self.ex.can_extract("proc sql; select 1; quit;")
 
     def test_extracts_output_and_source_tables(self):
-        code = "data RISKODS.OUTPUT; set RAWDATA.SOURCE; run;"
+        code = "data SALESODS.OUTPUT; set RAWDATA.SOURCE; run;"
         tables, *_ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         names = {t.name for t in tables}
         assert "OUTPUT" in names
@@ -118,10 +118,10 @@ class TestDataStepExtractor:
         )
 
     def test_assignment_emits_column_and_lineage(self):
-        code = "data MART.OUT; set RISKODS.SRC; EXPOSURE = BAL * RATE; run;"
+        code = "data MART.OUT; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;"
         _, cols, lineage, _ = self.ex.extract(code, _NO_LOG, "j1", "s1")
-        assert "EXPOSURE" in {c.name for c in cols}
-        assert any(h.transformation_logic == "BAL * RATE" for h in lineage)
+        assert "AMOUNT" in {c.name for c in cols}
+        assert any(h.transformation_logic == "QTY * PRICE" for h in lineage)
 
     def test_no_source_emits_column_without_lineage(self):
         code = "data WORK.OUT; X = 1; run;"
@@ -147,7 +147,7 @@ class TestGenericProcExtractor:
         assert self.ex.can_extract("proc sort data=A out=B; by x; run;")
 
     def test_sort_emits_tables_no_flag(self):
-        code = "proc sort data=RISKODS.A out=WORK.B; by x; run;"
+        code = "proc sort data=SALESODS.A out=WORK.B; by x; run;"
         tables, _, _, flags = self.ex.extract(code, _NO_LOG, "j1", "s1")
         assert {t.name for t in tables} == {"A", "B"}
         assert flags == []
@@ -177,7 +177,7 @@ class TestProcSqlExtractor:
     def test_extracts_create_table(self):
         code = (
             "proc sql;\n"
-            "create table RISKODS.OUTPUT as\n"
+            "create table SALESODS.OUTPUT as\n"
             "select * from RAWDATA.SOURCE;\n"
             "quit;"
         )
@@ -226,24 +226,24 @@ class TestProcSqlExtractor:
         code = (
             "proc sql;\n"
             "create table MART.OUT as\n"
-            "select a.BAL as EXPOSURE from RISKODS.SRC a;\n"
+            "select a.QTY as AMOUNT from SALESODS.SRC a;\n"
             "quit;"
         )
         _, cols, lineage, _ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         names = {c.name for c in cols}
-        assert "EXPOSURE" in names
-        assert "BAL" in names
+        assert "AMOUNT" in names
+        assert "QTY" in names
 
     def test_lineage_edge_carries_transform_logic(self):
         code = (
             "proc sql;\n"
             "create table MART.OUT as\n"
-            "select a.BAL * 1.1 as ADJ from RISKODS.SRC a;\n"
+            "select a.QTY * 1.1 as ADJ from SALESODS.SRC a;\n"
             "quit;"
         )
         _, _, lineage, _ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         assert lineage
-        assert any("BAL" in h.transformation_logic for h in lineage)
+        assert any("QTY" in h.transformation_logic for h in lineage)
 
 
 # ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ class TestScd2Extractor:
         assert not self.ex.can_extract("data x; run;")
 
     def test_extracts_in_out_tables(self):
-        code = "%di_scd2_load(in=RISKODS.SRC, out=MART.DIM_TABLE);"
+        code = "%di_scd2_load(in=SALESODS.SRC, out=MART.DIM_TABLE);"
         tables, _, _, flags = self.ex.extract(code, _NO_LOG, "j1", "s1")
         names = {t.name for t in tables}
         assert "SRC" in names
@@ -376,7 +376,7 @@ class TestProcSqlBatchA:
     def test_f6_macro_source_resolved_via_log_no_flag(self, tmp_path):
         log = tmp_path / "j.log"
         log.write_text(
-            "SYMBOLGEN:  Macro variable SRC resolves to RISKODS.SOURCE\n"
+            "SYMBOLGEN:  Macro variable SRC resolves to SALESODS.SOURCE\n"
         )
         resolver = LogResolver(log)
         code = "proc sql;\ncreate table OUT as\nselect * from &SRC;\nquit;"
@@ -523,9 +523,11 @@ class TestProcSqlBatchB:
         code = "proc sql;\ncreate table OUT as\nselect * from A, B, C;\nquit;"
         tables, *_ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         src_names = {t.name for t in tables} - {"OUT"}
-        assert src_names >= {"A", "B", "C"}, (
-            "all three comma-joined source tables must be captured"
-        )
+        assert src_names >= {
+            "A",
+            "B",
+            "C",
+        }, "all three comma-joined source tables must be captured"
 
     def test_f5_comma_join_with_aliases(self):
         code = (
@@ -579,9 +581,11 @@ class TestDataStepBatchB:
         code = "data OUT; merge A B C; x = a+b; run;"
         tables, *_ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         src_names = {t.name for t in tables} - {"OUT"}
-        assert src_names >= {"A", "B", "C"}, (
-            "all three MERGE sources must be captured"
-        )
+        assert src_names >= {
+            "A",
+            "B",
+            "C",
+        }, "all three MERGE sources must be captured"
 
     # F9 — dataset options stripped before parsing
     def test_f9_dataset_options_stripped(self):
@@ -692,19 +696,13 @@ class TestProcSqlBatchC:
     # Finding 5 — three-part dotted ident flagged, not silently dropped
     def test_f5_three_part_ident_emits_flag(self):
         """A.B.C in a FROM clause must produce a flag, not silently drop."""
-        code = (
-            "proc sql;\ncreate table OUT as\n"
-            "select * from A.B.C;\nquit;"
-        )
+        code = "proc sql;\ncreate table OUT as\nselect * from A.B.C;\nquit;"
         _, _, _, flags = self.ex.extract(code, _NO_LOG, "j1", "s1")
         assert flags, "a three-part table ref must produce at least one flag"
 
     def test_f5_three_part_ident_no_table_emitted(self):
         """A.B.C must not be emitted as a valid source table."""
-        code = (
-            "proc sql;\ncreate table OUT as\n"
-            "select * from A.B.C;\nquit;"
-        )
+        code = "proc sql;\ncreate table OUT as\nselect * from A.B.C;\nquit;"
         tables, _, _, _ = self.ex.extract(code, _NO_LOG, "j1", "s1")
         src_names = {t.name for t in tables} - {"OUT"}
         assert not any("." in n for n in src_names), (

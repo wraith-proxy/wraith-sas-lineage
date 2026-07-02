@@ -9,13 +9,13 @@ from sas_lineage.parser.freshness import (
 
 
 def test_daily_from_name():
-    freq, evidence = infer_from_name("RISK_LOAD_DAILY")
+    freq, evidence = infer_from_name("SALES_LOAD_DAILY")
     assert freq == "daily"
     assert evidence
 
 
 def test_weekly_from_name():
-    freq, _ = infer_from_name("CREDIT_WEEKLY_AGG")
+    freq, _ = infer_from_name("ORDERS_WEEKLY_AGG")
     assert freq == "weekly"
 
 

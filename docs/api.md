@@ -8,6 +8,8 @@
     * [run\_timestamps](#sas_lineage.parser.log_resolver.LogResolver.run_timestamps)
     * [log\_step\_count](#sas_lineage.parser.log_resolver.LogResolver.log_step_count)
     * [mprint\_statements](#sas_lineage.parser.log_resolver.LogResolver.mprint_statements)
+    * [executed\_code](#sas_lineage.parser.log_resolver.LogResolver.executed_code)
+    * [row\_counts](#sas_lineage.parser.log_resolver.LogResolver.row_counts)
     * [datatype](#sas_lineage.parser.log_resolver.LogResolver.datatype)
     * [resolve](#sas_lineage.parser.log_resolver.LogResolver.resolve)
 * [builder](#sas_lineage.parser.builder)
@@ -17,6 +19,7 @@
     * [kind](#sas_lineage.parser.sql_tokeniser.Token.kind)
     * [value](#sas_lineage.parser.sql_tokeniser.Token.value)
   * [scan\_tokens](#sas_lineage.parser.sql_tokeniser.scan_tokens)
+  * [qualified\_column\_refs](#sas_lineage.parser.sql_tokeniser.qualified_column_refs)
   * [extract\_sql\_tables](#sas_lineage.parser.sql_tokeniser.extract_sql_tables)
 * [data\_step](#sas_lineage.parser.extractors.data_step)
   * [DataStepExtractor](#sas_lineage.parser.extractors.data_step.DataStepExtractor)
@@ -41,6 +44,8 @@
 * [freshness](#sas_lineage.parser.freshness)
   * [infer\_from\_name](#sas_lineage.parser.freshness.infer_from_name)
   * [infer\_from\_log\_timestamps](#sas_lineage.parser.freshness.infer_from_log_timestamps)
+* [di\_headers](#sas_lineage.parser.di_headers)
+  * [harvest\_di\_headers](#sas_lineage.parser.di_headers.harvest_di_headers)
 * [reconciler](#sas_lineage.parser.reconciler)
   * [reconcile](#sas_lineage.parser.reconciler.reconcile)
 * [walker](#sas_lineage.parser.walker)
@@ -49,15 +54,20 @@
   * [walk\_pairs](#sas_lineage.parser.walker.walk_pairs)
 * [app](#sas_lineage.web_ui.app)
   * [create\_app](#sas_lineage.web_ui.app.create_app)
+  * [main](#sas_lineage.web_ui.app.main)
+* [db](#sas_lineage.web_ui.db)
+  * [find\_columns](#sas_lineage.web_ui.db.find_columns)
 * [models](#sas_lineage.models)
   * [Layer](#sas_lineage.models.Layer)
   * [StepType](#sas_lineage.models.StepType)
   * [UnmappableReason](#sas_lineage.models.UnmappableReason)
+  * [Evidence](#sas_lineage.models.Evidence)
   * [Frequency](#sas_lineage.models.Frequency)
   * [Table](#sas_lineage.models.Table)
   * [Column](#sas_lineage.models.Column)
   * [Job](#sas_lineage.models.Job)
   * [LineageChain](#sas_lineage.models.LineageChain)
+  * [TableLineage](#sas_lineage.models.TableLineage)
   * [QualityRule](#sas_lineage.models.QualityRule)
   * [Flag](#sas_lineage.models.Flag)
   * [ReconciliationResult](#sas_lineage.models.ReconciliationResult)
@@ -196,6 +206,29 @@ def mprint_statements() -> list[str]
 
 Return fully-resolved statement text captured from MPRINT lines.
 
+<a id="sas_lineage.parser.log_resolver.LogResolver.executed_code"></a>
+
+#### executed\_code
+
+```python
+def executed_code() -> str
+```
+
+Reassemble MPRINT fragments into a parseable code stream.
+
+MPRINT lines are post-macro-expansion executed statements; joined
+one per line they feed straight back through the block splitter.
+
+<a id="sas_lineage.parser.log_resolver.LogResolver.row_counts"></a>
+
+#### row\_counts
+
+```python
+def row_counts() -> dict[str, int]
+```
+
+Table name (upper) → last observed row count from log NOTEs.
+
 <a id="sas_lineage.parser.log_resolver.LogResolver.datatype"></a>
 
 #### datatype
@@ -226,7 +259,7 @@ fully_resolved is False if any &macvar remains after substitution.
 ProvenanceBuilder: orchestrates Walker + extractors → Provenance.
 
 Usage:
-    builder = ProvenanceBuilder(code_dir, log_dir, estate="acme-risk")
+    builder = ProvenanceBuilder(code_dir, log_dir, estate="acme-sales")
     provenance = builder.build()
     provenance.to_json()
 
@@ -286,6 +319,20 @@ def scan_tokens(buffer: str) -> list[Token]
 
 Single L→R scan: skip strings, track paren depth, emit tokens.
 
+<a id="sas_lineage.parser.sql_tokeniser.qualified_column_refs"></a>
+
+#### qualified\_column\_refs
+
+```python
+def qualified_column_refs(buffer: str) -> dict[str, set[str]]
+```
+
+Map lowercase column name → qualifier aliases seen as ``alias.col``.
+
+FROM-clause ``lib.table`` refs also land here (they are dotted idents
+too); callers only consult specific column names, so the collision is
+harmless unless a column shares its name with a table.
+
 <a id="sas_lineage.parser.sql_tokeniser.extract_sql_tables"></a>
 
 #### extract\_sql\_tables
@@ -326,7 +373,7 @@ Extracts column-level lineage from a DATA step block.
 
 Unknown-macro-call extractor.
 
-A user macro call (%load_risk(...)) can hide an entire transform the parser
+A user macro call (%load_sales(...)) can hide an entire transform the parser
 cannot see into. SCD2 calls are handled by the SCD2 extractor; SAS
 macro-language statements (%let, %if, %do, ...) and common utility functions
 are control flow, not lineage. Everything else is flagged for human review
@@ -550,6 +597,42 @@ Infer run cadence from a list of log execution timestamps.
 Requires at least 3 timestamps for a confident inference.
 Returns (frequency_label, evidence).
 
+<a id="sas_lineage.parser.di_headers"></a>
+
+# di\_headers
+
+DI Studio artefact harvester: builder pre-pass over RAW code.
+
+DI-generated jobs open every transformation step with a boxed comment
+carrying the step name, transform type, and Source/Target table lines
+annotated with metadata-repository object IDs. Headers are comments, so
+this runs on raw code before the splitter's comment stripping deletes
+them (see .claude/knowledge/gotchas.md).
+
+Each header also owns the text span down to the next header. Where DI
+emitted a mapping tab, that span carries `_OUTPUT{n}_col{N}_*` %LET
+families: per-target-column name, type, derivation expression (`_exp`)
+and input column list. Inputs are unqualified (no `_input_table`
+variable exists — unfixed in DI since at least 2012), so column edges
+are only attributed when the header names exactly one source table;
+with several source tables every mapped column gets a `multi_source`
+flag instead, for the SQL fallback to resolve.
+
+<a id="sas_lineage.parser.di_headers.harvest_di_headers"></a>
+
+#### harvest\_di\_headers
+
+```python
+def harvest_di_headers(code: str, job_id: str) -> DiHarvest
+```
+
+Extract DI tables, table edges, and mapped column edges.
+
+A comment block counts as a step header only if it carries a Step:
+line. A malformed header/mapping line simply does not match and
+contributes nothing — the executable code below is still parsed by
+the ordinary extractors, so no lineage is lost, only the metadata.
+
 <a id="sas_lineage.parser.reconciler"></a>
 
 # reconciler
@@ -564,7 +647,7 @@ Excel never overwrites parser output. Mismatches are flagged for human review.
 
 ```python
 def reconcile(provenance_columns: dict[str, str],
-              excel_path: Optional[Path]) -> ReconciliationResult
+              excel_path: Path | None) -> ReconciliationResult
 ```
 
 Compare parser-discovered column mappings against an Excel override.
@@ -624,6 +707,45 @@ def create_app(db_path: Path | None = None) -> Flask
 
 Create the Flask app. DB_PATH env var or arg sets the database.
 
+<a id="sas_lineage.web_ui.app.main"></a>
+
+#### main
+
+```python
+@click.command()
+@click.option(
+    "--db",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Path to lineage.db (default: DB_PATH env or ./lineage.db).",
+)
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="Port to serve on (default: FLASK_PORT env or 5000).",
+)
+def main(db: Path | None, port: int | None) -> None
+```
+
+Serve the lineage explorer web UI.
+
+<a id="sas_lineage.web_ui.db"></a>
+
+# db
+
+SQLite/Turso connection helper for the web UI.
+
+<a id="sas_lineage.web_ui.db.find_columns"></a>
+
+#### find\_columns
+
+```python
+def find_columns(conn: sqlite3.Connection, name: str) -> list[dict]
+```
+
+Match columns by name or ``table.name``, case-insensitive.
+
 <a id="sas_lineage.models"></a>
 
 # models
@@ -635,7 +757,7 @@ Canonical data model: mirrors provenance.json and the Turso schema.
 ## Layer
 
 ```python
-class Layer(str, Enum)
+class Layer(StrEnum)
 ```
 
 Data layer classification for SAS tables.
@@ -645,7 +767,7 @@ Data layer classification for SAS tables.
 ## StepType
 
 ```python
-class StepType(str, Enum)
+class StepType(StrEnum)
 ```
 
 SAS step type that produced a lineage hop.
@@ -655,17 +777,27 @@ SAS step type that produced a lineage hop.
 ## UnmappableReason
 
 ```python
-class UnmappableReason(str, Enum)
+class UnmappableReason(StrEnum)
 ```
 
 Reason a column or step could not be fully resolved.
+
+<a id="sas_lineage.models.Evidence"></a>
+
+## Evidence
+
+```python
+class Evidence(StrEnum)
+```
+
+Where a lineage edge was derived from.
 
 <a id="sas_lineage.models.Frequency"></a>
 
 ## Frequency
 
 ```python
-class Frequency(str, Enum)
+class Frequency(StrEnum)
 ```
 
 Inferred run cadence for a SAS job.
@@ -713,6 +845,20 @@ class LineageChain()
 ```
 
 One hop in the column-level lineage chain from source to MART.
+
+<a id="sas_lineage.models.TableLineage"></a>
+
+## TableLineage
+
+```python
+@dataclass
+class TableLineage()
+```
+
+A table-level edge (source table → target table) within one step.
+
+Carries DI-header and SYSLAST derived flow so user-written steps with
+no column mapping still contribute lineage.
 
 <a id="sas_lineage.models.QualityRule"></a>
 
@@ -860,6 +1006,13 @@ CLI entry point for the Schema Mapper (Tool 2).
     help="Path for the gaps report.",
 )
 @click.option(
+    "--diff",
+    default="lineage_diff.json",
+    show_default=True,
+    type=click.Path(path_type=Path),
+    help="Path for the intended-vs-executed lineage diff report.",
+)
+@click.option(
     "--owners",
     default=None,
     type=click.Path(exists=True, path_type=Path),
@@ -872,7 +1025,7 @@ CLI entry point for the Schema Mapper (Tool 2).
     help="Optional quality CSV (job,rule_name,rule_definition,column_id).",
 )
 def main(provenance: Path, db: Path, contracts_dir: Path, gaps: Path,
-         owners: Path | None, params: Path | None) -> None
+         diff: Path, owners: Path | None, params: Path | None) -> None
 ```
 
 Load provenance into a database and generate ODCS data contracts.
@@ -930,4 +1083,3 @@ def load_quality_rules(path: Path, jobs: list[dict]) -> list[dict]
 ```
 
 Build quality_rule dicts from a CSV, keyed to jobs by name.
-

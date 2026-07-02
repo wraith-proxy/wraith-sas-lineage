@@ -9,7 +9,7 @@ from sas_lineage.schema_mapper.odcs import generate_contract
 _TABLE = {
     "id": "tbl_aabbccddeeff",
     "name": "ALL_EMP",
-    "libref": "RISKODS",
+    "libref": "SALESODS",
     "engine": "BASE",
     "path": "/data/ods",
     "layer": "ODS",
@@ -19,7 +19,7 @@ _COLUMNS = [
     {
         "id": "col_aabbccddeeff",
         "table_id": "tbl_aabbccddeeff",
-        "name": "EXPOSURE_AMT",
+        "name": "ORDER_AMT",
         "data_type": "NUM",
         "nullable": True,
         "layer": "ODS",
@@ -27,18 +27,18 @@ _COLUMNS = [
 ]
 _JOB = {
     "id": "job_aabb",
-    "name": "RISK_LOAD",
+    "name": "SALES_LOAD",
     "frequency": "daily",
     "frequency_evidence": ["name_token:daily"],
     "owner": "Alice",
-    "domain": "risk",
+    "domain": "sales",
 }
 _QUALITY_RULES = [
     {
         "id": "qr_aabb",
         "job_id": "job_aabb",
         "rule_name": "NON_NEGATIVE",
-        "rule_definition": "EXPOSURE_AMT >= 0",
+        "rule_definition": "ORDER_AMT >= 0",
         "applies_to_column_id": "col_aabbccddeeff",
     }
 ]
@@ -75,7 +75,7 @@ def test_contract_has_columns(tmp_path: Path):
     parsed = yaml.safe_load(out.read_text())
     cols = parsed["schema"]["columns"]
     assert len(cols) == 1
-    assert cols[0]["name"] == "EXPOSURE_AMT"
+    assert cols[0]["name"] == "ORDER_AMT"
 
 
 def test_contract_has_quality_rules(tmp_path: Path):
@@ -93,7 +93,7 @@ def test_contract_owner_and_domain(tmp_path: Path):
     )
     parsed = yaml.safe_load(out.read_text())
     assert parsed["owner"] == "Alice"
-    assert parsed["domain"] == "risk"
+    assert parsed["domain"] == "sales"
 
 
 def test_contract_freshness(tmp_path: Path):

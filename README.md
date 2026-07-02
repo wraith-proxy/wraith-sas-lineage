@@ -5,7 +5,7 @@
 # 👻 wraith-sas-lineage
 ### *SAS Lineage Extraction for the Ghost Stack*
 
-**wraith-sas-lineage** extracts data lineage from SAS DI Studio code and verbose execution logs, maps it to Open Data Contract Standard (ODCS) contracts, and serves a local read-only lineage explorer. One JSON artefact connects all three tools.
+**wraith-sas-lineage** extracts data lineage from SAS DI Studio code and verbose execution logs, maps it to Open Data Contract Standard (ODCS) contracts, and serves a local lineage explorer. One JSON artefact connects all three tools.
 
 Designed for large SAS estates running on Unix. Output feeds [wraith-modelgen](https://git.thomaspeoples.com/thomaspeoples/wraith-modelgen) to auto-generate dbt on BigQuery.
 
@@ -29,8 +29,8 @@ Designed for large SAS estates running on Unix. Output feeds [wraith-modelgen](h
 | Command | Input | Output |
 |---|---|---|
 | `sas-parse` | `.sas` files + verbose logs | `provenance.json` |
-| `sas-map` | `provenance.json` | `lineage.db`, ODCS YAML contracts, `mapping_gaps.json` |
-| `sas-ui` | `lineage.db` | Read-only lineage explorer |
+| `sas-map` | `provenance.json` | `lineage.db`, ODCS YAML contracts, `mapping_gaps.json`, `lineage_diff.json` |
+| `sas-ui` | `lineage.db` | Local lineage explorer |
 
 ---
 
@@ -57,7 +57,7 @@ uv run poe setup
 sas-parse \
   --code-dir /path/to/sas/code \
   --log-dir  /path/to/verbose/logs \
-  --estate   acme-risk \
+  --estate   acme-sales \
   --output   provenance.json
 
 # Map to DB + ODCS contracts

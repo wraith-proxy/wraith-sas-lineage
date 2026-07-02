@@ -49,7 +49,7 @@ detect-secrets scan > .secrets.baseline
 
 ## The web UI
 
-`sas-ui` is a read-only Flask application. It exposes no write endpoints. It is designed for local use only. Do not expose it to a network without authentication in front of it.
+`sas-ui` exposes no write endpoints. It is designed for local use only. Do not expose it to a network without authentication in front of it.
 
 The SQLite file (`lineage.db`) contains table and column names from the SAS estate. Treat it with the same sensitivity as a data dictionary.
 

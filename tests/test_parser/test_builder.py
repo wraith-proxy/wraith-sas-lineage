@@ -104,23 +104,80 @@ def test_build_register_extractor(tmp_path: Path):
 def test_build_stitches_multi_step_chain(tmp_path: Path):
     code_dir, log_dir = _make_estate(tmp_path)
     (code_dir / "MART_LOAD.sas").write_text(
-        "data RISKODS.STG; set RISKODS.SRC; EXPOSURE = BAL * RATE; run;\n"
+        "data SALESODS.STG; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;\n"
         "proc sql; create table MART.MART as "
-        "select s.EXPOSURE as FINAL_EXP from RISKODS.STG s; quit;\n"
+        "select s.AMOUNT as FINAL_AMT from SALESODS.STG s; quit;\n"
     )
     p = _builder(code_dir, log_dir).build()
-    final = next(c for c in p.columns if c.name == "FINAL_EXP")
+    final = next(c for c in p.columns if c.name == "FINAL_AMT")
     hops = [h for h in p.lineage_chain if h.mart_column_id == final.id]
     assert hops
-    # Chain reaches back through the DATA step to BAL/RATE (order >= 2).
+    # Chain reaches back through the DATA step to QTY/PRICE (order >= 2).
     assert max(h.chain_order for h in hops) >= 2
+
+
+def test_extractor_edges_carry_parsed_sql_evidence(tmp_path: Path):
+    code_dir, log_dir = _make_estate(tmp_path)
+    (code_dir / "MART_LOAD.sas").write_text(
+        "data SALESODS.STG; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;\n"
+        "proc sql; create table MART.MART as "
+        "select s.AMOUNT as FINAL_AMT from SALESODS.STG s; quit;\n"
+    )
+    p = _builder(code_dir, log_dir).build()
+    assert p.lineage_chain
+    assert all(h.evidence is not None for h in p.lineage_chain)
+    assert {h.evidence.value for h in p.lineage_chain} == {"parsed_sql"}
+
+
+def test_mprint_confirms_executed_edges(tmp_path: Path):
+    code_dir, log_dir = _make_estate(tmp_path)
+    (code_dir / "J.sas").write_text(
+        "data SALESODS.STG; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;\n"
+    )
+    (log_dir / "J.log").write_text(
+        "MPRINT(LOADER):   data SALESODS.STG;\n"
+        "MPRINT(LOADER):   set SALESODS.SRC;\n"
+        "MPRINT(LOADER):   AMOUNT = QTY * PRICE;\n"
+        "MPRINT(LOADER):   run;\n"
+    )
+    p = _builder(code_dir, log_dir).build()
+    assert p.lineage_chain
+    assert {h.evidence.value for h in p.lineage_chain} == {"log_confirmed"}
+
+
+def test_mprint_reveals_log_only_edges(tmp_path: Path):
+    """Code hides the transform in a macro call; only the log shows it."""
+    code_dir, log_dir = _make_estate(tmp_path)
+    (code_dir / "J.sas").write_text("%load_sales(in=SRC, out=STG);\n")
+    (log_dir / "J.log").write_text(
+        "MPRINT(LOAD_SALES):   data SALESODS.STG;\n"
+        "MPRINT(LOAD_SALES):   set SALESODS.SRC;\n"
+        "MPRINT(LOAD_SALES):   AMOUNT = QTY * PRICE;\n"
+        "MPRINT(LOAD_SALES):   run;\n"
+    )
+    p = _builder(code_dir, log_dir).build()
+    log_edges = [
+        h for h in p.lineage_chain if h.evidence.value == "log_confirmed"
+    ]
+    assert log_edges, "log-only hops must be captured"
+
+
+def test_code_only_edges_keep_static_evidence(tmp_path: Path):
+    """Log lacks the DATA step: edge stays parsed_sql for the diff."""
+    code_dir, log_dir = _make_estate(tmp_path)
+    (code_dir / "J.sas").write_text(
+        "data SALESODS.STG; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;\n"
+    )
+    (log_dir / "J.log").write_text("MPRINT(OTHER):   options nosymbolgen;\n")
+    p = _builder(code_dir, log_dir).build()
+    assert {h.evidence.value for h in p.lineage_chain} == {"parsed_sql"}
 
 
 def test_build_libname_inheritance(tmp_path: Path):
     code_dir, log_dir = _make_estate(tmp_path)
     (code_dir / "J.sas").write_text(
-        "libname RISKODS DB2 database=PR01;\n"
-        "data RISKODS.OUT; set RISKODS.SRC; X = A; run;\n"
+        "libname SALESODS DB2 database=PR01;\n"
+        "data SALESODS.OUT; set SALESODS.SRC; X = A; run;\n"
     )
     p = _builder(code_dir, log_dir).build()
     out = next(t for t in p.tables if t.name == "OUT")
@@ -128,3 +185,16 @@ def test_build_libname_inheritance(tmp_path: Path):
     assert out.layer.value == "ODS"
     # Library pseudo-rows are dropped from the dataset list.
     assert not any(t.name == t.libref for t in p.tables)
+
+
+def test_work_w_tables_classified_intermediate(tmp_path: Path):
+    code_dir, log_dir = _make_estate(tmp_path)
+    (code_dir / "J.sas").write_text(
+        "data work.W54ABCDE;\n    set RAWLIB.ORDERS;\nrun;\n"
+        "data work.KEEP_ME;\n    set work.W54ABCDE;\nrun;\n"
+    )
+    p = _builder(code_dir, log_dir).build()
+    by_name = {t.name: t for t in p.tables}
+    assert by_name["W54ABCDE"].is_intermediate is True
+    assert by_name["KEEP_ME"].is_intermediate is False
+    assert by_name["ORDERS"].is_intermediate is False

@@ -26,6 +26,7 @@ class LogResolver:
         self._mprint: list[str] = []
         self._datatypes: dict[str, str] = {}
         self._step_notes = 0
+        self._row_counts: dict[str, int] = {}
         if log_path and log_path.exists():
             self._parse(log_path.read_text(errors="replace"))
 
@@ -47,6 +48,12 @@ class LogResolver:
                 line
             ) or patterns.LOG_PROC_NOTE.search(line):
                 self._step_notes += 1
+                continue
+            m = patterns.LOG_TABLE_CREATED.search(
+                line
+            ) or patterns.LOG_DATASET_OBS.search(line)
+            if m:
+                self._row_counts[m.group(1).upper()] = int(m.group(2))
                 continue
             m = patterns.LOG_DATATYPE.search(line)
             if m:
@@ -84,6 +91,18 @@ class LogResolver:
     def mprint_statements(self) -> list[str]:
         """Return fully-resolved statement text captured from MPRINT lines."""
         return self._mprint
+
+    def executed_code(self) -> str:
+        """Reassemble MPRINT fragments into a parseable code stream.
+
+        MPRINT lines are post-macro-expansion executed statements; joined
+        one per line they feed straight back through the block splitter.
+        """
+        return "\n".join(self._mprint)
+
+    def row_counts(self) -> dict[str, int]:
+        """Table name (upper) → last observed row count from log NOTEs."""
+        return self._row_counts
 
     def datatype(self, column_name: str) -> str | None:
         """Return the logged SAS datatype (CHAR/NUM) for a column, if known."""

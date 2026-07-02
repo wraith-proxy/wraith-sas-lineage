@@ -1,7 +1,7 @@
 """
 Unknown-macro-call extractor.
 
-A user macro call (%load_risk(...)) can hide an entire transform the parser
+A user macro call (%load_sales(...)) can hide an entire transform the parser
 cannot see into. SCD2 calls are handled by the SCD2 extractor; SAS
 macro-language statements (%let, %if, %do, ...) and common utility functions
 are control flow, not lineage. Everything else is flagged for human review

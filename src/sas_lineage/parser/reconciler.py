@@ -7,14 +7,13 @@ Excel never overwrites parser output. Mismatches are flagged for human review.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from sas_lineage.models import ReconciliationResult
 
 
 def reconcile(
     provenance_columns: dict[str, str],
-    excel_path: Optional[Path],
+    excel_path: Path | None,
 ) -> ReconciliationResult:
     """
     Compare parser-discovered column mappings against an Excel override.

@@ -125,9 +125,4 @@ line-length = 79
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
-
-[dependency-groups]
-dev = [
-    "detect-secrets>=1.5.0",
-]
+select = ["E", "F", "I", "UP"]

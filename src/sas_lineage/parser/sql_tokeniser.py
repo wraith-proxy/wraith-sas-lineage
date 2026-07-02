@@ -156,6 +156,25 @@ def _parse_slice(chunk: str) -> TableRef | None:
     return (None, ref, alias)
 
 
+def qualified_column_refs(buffer: str) -> dict[str, set[str]]:
+    """Map lowercase column name → qualifier aliases seen as ``alias.col``.
+
+    FROM-clause ``lib.table`` refs also land here (they are dotted idents
+    too); callers only consult specific column names, so the collision is
+    harmless unless a column shares its name with a table.
+    """
+    refs: dict[str, set[str]] = {}
+    for kind, value, *_ in scan_tokens(buffer):
+        if (
+            kind == "ident"
+            and value.count(".") == 1
+            and not value.startswith("&")
+        ):
+            qual, col = value.split(".")
+            refs.setdefault(col, set()).add(qual)
+    return refs
+
+
 def extract_sql_tables(buffer: str) -> list[TableRef]:
     """Harvest every FROM/JOIN table ref: comma-joins and nested included."""
     refs: list[TableRef] = []

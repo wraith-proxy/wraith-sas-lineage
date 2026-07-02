@@ -11,18 +11,18 @@ from sas_lineage.schema_mapper.cli import main as map_main
 from sas_lineage.web_ui.app import create_app
 
 _JOB = """\
-libname RISKODS BASE '/data/ods';
+libname SALESODS BASE '/data/ods';
 libname MART BASE '/data/mart';
 
-data RISKODS.STG;
-    set RISKODS.SRC;
-    EXPOSURE = BAL * RATE;
+data SALESODS.STG;
+    set SALESODS.SRC;
+    AMOUNT = QTY * PRICE;
 run;
 
 proc sql;
     create table MART.MART as
-    select s.EXPOSURE as FINAL_EXP
-    from RISKODS.STG s;
+    select s.AMOUNT as FINAL_AMT
+    from SALESODS.STG s;
 quit;
 """
 
@@ -50,7 +50,7 @@ def test_full_pipeline_emits_and_renders(tmp_path: Path):
             "--log-dir",
             str(logs),
             "--estate",
-            "credit-risk",
+            "acme-sales",
             "--output",
             str(prov),
             "--report",
@@ -63,25 +63,23 @@ def test_full_pipeline_emits_and_renders(tmp_path: Path):
     assert data["columns"], "expected columns to be emitted"
     assert data["lineage_chain"], "expected lineage chain to be emitted"
 
-    # FINAL_EXP is the terminal MART column; its chain must reach BAL/RATE.
-    final = next(c for c in data["columns"] if c["name"] == "FINAL_EXP")
+    # FINAL_AMT is the terminal MART column; its chain must reach QTY/PRICE.
+    final = next(c for c in data["columns"] if c["name"] == "FINAL_AMT")
     hops = [
         h for h in data["lineage_chain"] if h["mart_column_id"] == final["id"]
     ]
-    assert hops, "FINAL_EXP should have a provenance chain"
+    assert hops, "FINAL_AMT should have a provenance chain"
     assert max(h["chain_order"] for h in hops) >= 2, (
         "chain should span both steps"
     )
 
     # Tool 2: load + contracts + gaps, with manual owner/domain + quality.
     owners = tmp_path / "owners.csv"
-    owners.write_text(
-        "job,owner,domain\nMART_LOAD_DAILY,Risk Team,Credit Risk\n"
-    )
+    owners.write_text("job,owner,domain\nMART_LOAD_DAILY,Sales Team,Sales\n")
     params = tmp_path / "params.csv"
     params.write_text(
         "job,rule_name,rule_definition,column_id\n"
-        f"MART_LOAD_DAILY,EXP_NON_NEG,FINAL_EXP >= 0,{final['id']}\n"
+        f"MART_LOAD_DAILY,EXP_NON_NEG,FINAL_AMT >= 0,{final['id']}\n"
     )
 
     db = tmp_path / "lineage.db"
@@ -109,7 +107,7 @@ def test_full_pipeline_emits_and_renders(tmp_path: Path):
     mart_contract = next(contracts.glob("FDP_MART.yml"))
     contract = yaml.safe_load(mart_contract.read_text())
     assert contract["schema"]["columns"], "contract should carry columns"
-    assert contract["owner"] == "Risk Team"
+    assert contract["owner"] == "Sales Team"
     assert contract["quality"], "quality rules should attach to the contract"
 
     # Tool 3: the provenance page renders the real chain.
@@ -118,5 +116,5 @@ def test_full_pipeline_emits_and_renders(tmp_path: Path):
     resp = client.get(f"/provenance?col_id={final['id']}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "FINAL_EXP" in body
+    assert "FINAL_AMT" in body
     assert "mermaid" in body

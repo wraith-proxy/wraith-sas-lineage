@@ -26,3 +26,4 @@ provenance.json
 parse_report.json
 mapping_gaps.json
 contracts/
+lineage_diff.json
