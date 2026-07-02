@@ -2,6 +2,13 @@
 
 All notable changes to `wraith-sas-lineage` are documented here.
 
+## v0.3.0 (2026-07-02)
+
+### Features
+
+- All your base are belong to us' (#1) from feature/TJP-02071 into main
+- All your base are belong to us
+
 ## v0.2.0 (2026-06-21)
 
 ### Features
