@@ -19,7 +19,7 @@ _MINIMAL_PROVENANCE = {
         {
             "id": "tbl_aabbccddeeff",
             "name": "ALL_EMP",
-            "libref": "RISKODS",
+            "libref": "SALESODS",
             "engine": "BASE",
             "path": "/data/ods",
             "layer": "ODS",
@@ -30,7 +30,7 @@ _MINIMAL_PROVENANCE = {
         {
             "id": "col_aabbccddeeff",
             "table_id": "tbl_aabbccddeeff",
-            "name": "EXPOSURE_AMT",
+            "name": "ORDER_AMT",
             "layer": "ODS",
             "data_type": "NUM",
             "nullable": True,
@@ -39,7 +39,7 @@ _MINIMAL_PROVENANCE = {
     "jobs": [
         {
             "id": "job_aabbccddeeff",
-            "name": "RISK_ODS_LOAD_DAILY",
+            "name": "SALES_ODS_LOAD_DAILY",
             "flow_id": "flow_001",
             "frequency": "daily",
             "frequency_evidence": ["name_token:daily"],
@@ -120,6 +120,75 @@ def test_loader_idempotent(tmp_path: Path, provenance_file: Path):
     count = conn.execute("SELECT COUNT(*) FROM tables").fetchone()[0]
     conn.close()
     assert count == 1
+
+
+def test_loader_tolerates_pre_migration_provenance(
+    tmp_path: Path, provenance_file: Path
+):
+    """_MINIMAL_PROVENANCE has no meta_id/is_intermediate/table_lineage."""
+    import sqlite3
+
+    db = tmp_path / "test.db"
+    loader = ProvenanceLoader(db)
+    loader.connect()
+    loader.load(provenance_file)
+    loader.close()
+
+    conn = sqlite3.connect(db)
+    row = conn.execute(
+        "SELECT meta_id, is_intermediate FROM tables"
+    ).fetchone()
+    conn.close()
+    assert row == (None, 0)
+
+
+def test_loader_table_lineage_round_trip(tmp_path: Path):
+    import sqlite3
+
+    data = dict(_MINIMAL_PROVENANCE)
+    data["tables"] = [
+        dict(
+            _MINIMAL_PROVENANCE["tables"][0],
+            meta_id="A5CGXK2Q.BE0001XY",
+            is_intermediate=True,
+        ),
+        dict(
+            _MINIMAL_PROVENANCE["tables"][0],
+            id="tbl_112233445566",
+            name="SALES_MART",
+        ),
+    ]
+    data["table_lineage"] = [
+        {
+            "id": "tl_aabbccddeeff",
+            "source_table_id": "tbl_aabbccddeeff",
+            "target_table_id": "tbl_112233445566",
+            "job_id": "job_aabbccddeeff",
+            "step_name": "Load SALES_MART",
+            "transform_type": "Table Loader",
+            "evidence": "metadata_macro",
+        }
+    ]
+    p = tmp_path / "provenance.json"
+    p.write_text(json.dumps(data))
+
+    db = tmp_path / "test.db"
+    loader = ProvenanceLoader(db)
+    loader.connect()
+    loader.load(p)
+    loader.close()
+
+    conn = sqlite3.connect(db)
+    tl = conn.execute(
+        "SELECT source_table_id, target_table_id, evidence FROM table_lineage"
+    ).fetchone()
+    meta = conn.execute(
+        "SELECT meta_id, is_intermediate FROM tables WHERE id = ?",
+        ("tbl_aabbccddeeff",),
+    ).fetchone()
+    conn.close()
+    assert tl == ("tbl_aabbccddeeff", "tbl_112233445566", "metadata_macro")
+    assert meta == ("A5CGXK2Q.BE0001XY", 1)
 
 
 def test_loader_job_frequency(tmp_path: Path, provenance_file: Path):

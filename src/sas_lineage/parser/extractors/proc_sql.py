@@ -18,6 +18,7 @@ import re
 from sas_lineage.ids import lineage_chain_id as make_lc_id
 from sas_lineage.models import (
     Column,
+    Evidence,
     Flag,
     LineageChain,
     StepType,
@@ -253,6 +254,7 @@ class ProcSqlExtractor:
                         step_name=step_name,
                         step_type=StepType.PROC_SQL,
                         transformation_logic=expr,
+                        evidence=Evidence.PARSED_SQL,
                     )
                 )
 

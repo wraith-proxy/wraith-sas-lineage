@@ -30,7 +30,7 @@ def _sample_provenance() -> Provenance:
     table = Table(
         id="tbl_aabbccddeeff",
         name="ALL_EMP",
-        libref="RISKODS",
+        libref="SALESODS",
         engine="BASE",
         path="/data/ods",
         layer=Layer.ODS,
@@ -39,14 +39,14 @@ def _sample_provenance() -> Provenance:
     col = Column(
         id="col_aabbccddeeff",
         table_id="tbl_aabbccddeeff",
-        name="EXPOSURE_AMT",
+        name="ORDER_AMT",
         layer=Layer.ODS,
         data_type="NUM",
         nullable=True,
     )
     job = Job(
         id="job_aabbccddeeff",
-        name="RISK_ODS_LOAD_DAILY",
+        name="SALES_ODS_LOAD_DAILY",
         flow_id="flow_001",
         frequency=Frequency.DAILY,
         frequency_evidence=["name_token:daily"],
@@ -67,8 +67,8 @@ def _sample_provenance() -> Provenance:
     qr = QualityRule(
         id="qr_aabbccddeeff",
         job_id="job_aabbccddeeff",
-        rule_name="EXPOSURE_NON_NEGATIVE",
-        rule_definition="EXPOSURE_AMT >= 0",
+        rule_name="AMOUNT_NON_NEGATIVE",
+        rule_definition="ORDER_AMT >= 0",
         applies_to_column_id="col_aabbccddeeff",
     )
     flag = Flag(

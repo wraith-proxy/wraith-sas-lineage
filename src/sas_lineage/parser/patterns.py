@@ -39,8 +39,7 @@ DATA_STMT = re.compile(r"\A\s*data\s+", re.IGNORECASE)
 
 # Capture output dataset (with optional libref)
 DATA_TARGET = re.compile(
-    r"\A\s*data\s+([A-Za-z]\w{0,7})\.(\w+)|"
-    r"\A\s*data\s+(&?\w+)",
+    r"\A\s*data\s+([A-Za-z]\w{0,7})\.(\w+)|" r"\A\s*data\s+(&?\w+)",
     re.IGNORECASE,
 )
 
@@ -79,9 +78,7 @@ PROC_OUT_ARG = re.compile(
 
 # PROC SQL: CREATE TABLE ... AS
 SQL_CREATE_TABLE = re.compile(
-    r"\bcreate\s+table\s+"
-    r"(?:([A-Za-z]\w{0,7})\.)?(\w+)"
-    r"\s+as\b",
+    r"\bcreate\s+table\s+" r"(?:([A-Za-z]\w{0,7})\.)?(\w+)" r"\s+as\b",
     re.IGNORECASE,
 )
 
@@ -158,6 +155,16 @@ LOG_MLOGIC_VAR = re.compile(
 # Step boundary: NOTE: DATA statement used
 LOG_DATA_NOTE = re.compile(r"^NOTE:\s+DATA statement used", re.IGNORECASE)
 LOG_PROC_NOTE = re.compile(r"^NOTE:\s+PROCEDURE (\w+) used", re.IGNORECASE)
+
+# Runtime row counts: table creation and data set size NOTEs
+LOG_TABLE_CREATED = re.compile(
+    r"^NOTE:\s+Table\s+(\S+)\s+created,\s+with\s+(\d+)\s+rows",
+    re.IGNORECASE,
+)
+LOG_DATASET_OBS = re.compile(
+    r"^NOTE:\s+The data set\s+(\S+)\s+has\s+(\d+)\s+observations",
+    re.IGNORECASE,
+)
 
 # Datatype from PROC CONTENTS / dictionary.columns log output
 LOG_DATATYPE = re.compile(r"(\w+)\s+(\w+)\s+(Char|Num)\s+(\d+)", re.IGNORECASE)

@@ -29,9 +29,7 @@ from sas_lineage.parser.cli import main as parse_main
 # helpers
 # ---------------------------------------------------------------------------
 
-_SCHEMA = (
-    Path(__file__).parent.parent / "schema" / "turso.sql"
-)
+_SCHEMA = Path(__file__).parent.parent / "schema" / "turso.sql"
 
 
 def _check_values(sql_text: str, column_name: str) -> set[str]:
@@ -251,15 +249,15 @@ libname MART BASE '/data/mart';
 data ODS.COMBINED;
     merge ODS.ACCOUNTS ODS.LIMITS ODS.RATINGS;
     by ACCT_ID;
-    RISK_SCORE = RATING * LGD;
+    TOTAL_SCORE = POINTS * WEIGHT;
 run;
 
 /* step 2: PROC SQL with JOIN + qualified columns + subquery */
 proc sql;
-    create table MART.RISK_MART as
+    create table MART.SALES_MART as
     select
         c.ACCT_ID,
-        c.RISK_SCORE as FINAL_SCORE,
+        c.TOTAL_SCORE as FINAL_SCORE,
         (select max(R) from ODS.REF_RATES) as RATE_CAP,
         l.LIMIT_AMT
     from ODS.COMBINED c
@@ -273,7 +271,7 @@ def _build_job_dir(tmp_path: Path, code: str) -> tuple[Path, Path]:
     log_dir = tmp_path / "logs"
     code_dir.mkdir()
     log_dir.mkdir()
-    (code_dir / "RISK_LOAD.sas").write_text(code)
+    (code_dir / "SALES_LOAD.sas").write_text(code)
     return code_dir, log_dir
 
 
@@ -288,23 +286,29 @@ class TestEndToEndMultiStep:
         r = runner.invoke(
             parse_main,
             [
-                "--code-dir", str(code_dir),
-                "--log-dir", str(log_dir),
-                "--estate", "test-estate",
-                "--output", str(prov),
-                "--report", str(report),
+                "--code-dir",
+                str(code_dir),
+                "--log-dir",
+                str(log_dir),
+                "--estate",
+                "test-estate",
+                "--output",
+                str(prov),
+                "--report",
+                str(report),
             ],
         )
         assert r.exit_code == 0, r.output
         import json
+
         return json.loads(prov.read_text())
 
     def test_output_tables_discovered(self, tmp_path: Path):
         data = self._run(tmp_path)
         names = {t["name"] for t in data["tables"]}
         assert "COMBINED" in names, "DATA step output COMBINED must be emitted"
-        assert "RISK_MART" in names, (
-            "PROC SQL output RISK_MART must be emitted"
+        assert "SALES_MART" in names, (
+            "PROC SQL output SALES_MART must be emitted"
         )
 
     def test_source_tables_discovered(self, tmp_path: Path):
@@ -327,8 +331,8 @@ class TestEndToEndMultiStep:
         assert "FINAL_SCORE" in col_names, (
             "aliased column FINAL_SCORE must be emitted"
         )
-        assert "RISK_SCORE" in col_names, (
-            "DATA step assigned column RISK_SCORE must be emitted"
+        assert "TOTAL_SCORE" in col_names, (
+            "DATA step assigned column TOTAL_SCORE must be emitted"
         )
 
     def test_lineage_chain_not_empty(self, tmp_path: Path):
@@ -348,17 +352,15 @@ class TestEndToEndMultiStep:
         lineage edges should reach COMBINED columns from a single upstream."""
         data = self._run(tmp_path)
         combined_cols = {
-            c["id"]
-            for c in data["columns"]
-            if c["name"] == "RISK_SCORE"
+            c["id"] for c in data["columns"] if c["name"] == "TOTAL_SCORE"
         }
-        # There may be lineage from COMBINED → RISK_MART, but there must be
-        # no edges that claim RISK_SCORE is from a single MERGE source table
+        # There may be lineage from COMBINED → SALES_MART, but there must be
+        # no edges that claim TOTAL_SCORE is from a single MERGE source table
         # (because the merge is multi-source and attribution is partial).
         # We just assert the flag is present (tested above) as the canonical
         # signal — this test confirms the flag exists when lineage is partial.
         assert combined_cols, (
-            "RISK_SCORE column must be discoverable in the provenance"
+            "TOTAL_SCORE column must be discoverable in the provenance"
         )
 
 
@@ -393,16 +395,22 @@ class TestFlagNeverDrop:
         r = runner.invoke(
             parse_main,
             [
-                "--code-dir", str(code_dir),
-                "--log-dir", str(log_dir),
-                "--estate", "test",
-                "--output", str(prov),
-                "--report", str(report),
+                "--code-dir",
+                str(code_dir),
+                "--log-dir",
+                str(log_dir),
+                "--estate",
+                "test",
+                "--output",
+                str(prov),
+                "--report",
+                str(report),
             ],
         )
         assert r.exit_code == 0, r.output
 
         import json
+
         data = json.loads(prov.read_text())
         assert data["flags"], (
             "gnarly construct (unresolved macro + unqualified col in join) "
@@ -423,15 +431,21 @@ class TestFlagNeverDrop:
         runner.invoke(
             parse_main,
             [
-                "--code-dir", str(code_dir),
-                "--log-dir", str(log_dir),
-                "--estate", "test",
-                "--output", str(prov),
-                "--report", str(report),
+                "--code-dir",
+                str(code_dir),
+                "--log-dir",
+                str(log_dir),
+                "--estate",
+                "test",
+                "--output",
+                str(prov),
+                "--report",
+                str(report),
             ],
         )
 
         import json
+
         data = json.loads(prov.read_text())
         names = {t["name"] for t in data["tables"]}
         assert "OUT" in names, (
@@ -452,15 +466,21 @@ class TestFlagNeverDrop:
         runner.invoke(
             parse_main,
             [
-                "--code-dir", str(code_dir),
-                "--log-dir", str(log_dir),
-                "--estate", "test",
-                "--output", str(prov),
-                "--report", str(report),
+                "--code-dir",
+                str(code_dir),
+                "--log-dir",
+                str(log_dir),
+                "--estate",
+                "test",
+                "--output",
+                str(prov),
+                "--report",
+                str(report),
             ],
         )
 
         import json
+
         data = json.loads(prov.read_text())
         reasons = {f["reason"] for f in data["flags"]}
         assert "macro_unresolved" in reasons, (
@@ -481,15 +501,21 @@ class TestFlagNeverDrop:
         runner.invoke(
             parse_main,
             [
-                "--code-dir", str(code_dir),
-                "--log-dir", str(log_dir),
-                "--estate", "test",
-                "--output", str(prov),
-                "--report", str(report),
+                "--code-dir",
+                str(code_dir),
+                "--log-dir",
+                str(log_dir),
+                "--estate",
+                "test",
+                "--output",
+                str(prov),
+                "--report",
+                str(report),
             ],
         )
 
         import json
+
         data = json.loads(prov.read_text())
         reasons = {f["reason"] for f in data["flags"]}
         assert "multi_source" in reasons, (

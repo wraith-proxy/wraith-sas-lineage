@@ -17,6 +17,7 @@ import re
 from sas_lineage.ids import lineage_chain_id as make_lc_id
 from sas_lineage.models import (
     Column,
+    Evidence,
     Flag,
     LineageChain,
     StepType,
@@ -311,5 +312,6 @@ def _extract_assignments(
                     step_name=step_name,
                     step_type=StepType.DATA,
                     transformation_logic=rhs,
+                    evidence=Evidence.PARSED_SQL,
                 )
             )

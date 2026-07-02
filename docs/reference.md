@@ -25,7 +25,7 @@ Full JSON Schema at `schema/provenance.schema.json` (draft/2020-12).
 |---|---|---|
 | `generated_at` | ISO 8601 string | UTC timestamp of the parse run |
 | `parser_version` | string | `wraith-sas-lineage` version |
-| `estate` | string | Estate identifier (e.g. `acme-risk`) |
+| `estate` | string | Estate identifier (e.g. `acme-sales`) |
 | `job_count` | integer | Number of jobs parsed |
 | `flow_count` | integer | Number of distinct flow IDs found |
 

@@ -25,7 +25,7 @@ Ingests `.sas` source files and their verbose execution logs. Emits `provenance.
 sas-parse \
   --code-dir /path/to/sas/code \
   --log-dir  /path/to/verbose/logs \
-  --estate   acme-risk \
+  --estate   acme-sales \
   --output   provenance.json \
   --report   parse_report.json
 ```
@@ -87,6 +87,7 @@ sas-map \
 | `--db` | `lineage.db` | SQLite/Turso database output path |
 | `--contracts-dir` | `contracts` | Directory for generated ODCS YAML contracts |
 | `--gaps` | `mapping_gaps.json` | Gaps report: missing owners, domains, unmapped rules |
+| `--diff` | `lineage_diff.json` | Intended-vs-executed lineage diff (see below) |
 | `--owners` | _(none)_ | Optional CSV (`job,owner,domain`) merged into jobs/contracts |
 | `--params` | _(none)_ | Optional quality-rule CSV (`job,rule_name,rule_definition,column_id`) |
 
@@ -126,11 +127,27 @@ Contracts consumed directly by [wraith-modelgen](https://git.thomaspeoples.com/t
 | `flagged_columns` | Lineage entries that carry extraction flags |
 | `unmapped_quality_rules` | Quality rules not yet tied to a specific column |
 
+### Intended-vs-executed diff
+
+Every lineage edge carries an `evidence` attribute:
+
+| Evidence | Meaning |
+|---|---|
+| `metadata_macro` | Derived from DI headers / `_OUTPUT*` mapping macros |
+| `parsed_sql` | Derived by statically parsing the code |
+| `log_confirmed` | Confirmed (or revealed) by MPRINT execution logs |
+
+`lineage_diff.json` compares the two worlds: `intended_not_executed` lists
+edges the static parse promised but no log confirmed; `executed_not_intended`
+lists edges only the log revealed (code hidden inside user-written macros).
+Table row counts harvested from log NOTEs land in `parse_report.json` under
+`row_counts`.
+
 ---
 
 ## `sas-ui`
 
-Read-only Flask app for browsing the lineage database.
+Local Flask app for browsing the lineage database.
 
 ```bash
 sas-ui --db lineage.db
@@ -140,14 +157,15 @@ sas-ui --db lineage.db
 | Route | Description |
 |---|---|
 | `/flags` | All extraction flags grouped by reason |
-| `/provenance?col_id=<id>` | Full upstream lineage chain for a column |
-| `/lineage?col_id=<id>` | Downstream: which MART columns does this feed? |
+| `/provenance?col=<name>` | Full upstream lineage chain for a column |
+| `/lineage?col=<name>` | Downstream: which MART columns does this feed? |
 
-Column IDs are in the format `col_<12 hex chars>`. Find them in `provenance.json` or by querying `lineage.db` directly:
-
-```sql
-SELECT id, name, table_id FROM columns WHERE name = 'EXPOSURE_AMT';
-```
+Columns are looked up by name, case-insensitive — `ORDER_AMT` or
+`SALES_MART.ORDER_AMT` to disambiguate. Multiple matches render as a
+pick list. Stable IDs (`col_id=col_<12 hex chars>`) still work for
+deep links. The provenance view can hide hops through DI staging views
+(`work.W*` tables) via the "Hide intermediate hops" toggle
+(`&hide_intermediates=1`).
 
 ---
 

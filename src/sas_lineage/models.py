@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 
-class Layer(str, Enum):
+class Layer(StrEnum):
     """Data layer classification for SAS tables."""
 
     RAW = "RAW"
@@ -17,7 +16,7 @@ class Layer(str, Enum):
     MART = "MART"
 
 
-class StepType(str, Enum):
+class StepType(StrEnum):
     """SAS step type that produced a lineage hop."""
 
     DATA = "DATA"
@@ -29,7 +28,7 @@ class StepType(str, Enum):
     OTHER = "OTHER"
 
 
-class UnmappableReason(str, Enum):
+class UnmappableReason(StrEnum):
     """Reason a column or step could not be fully resolved."""
 
     MACRO_UNRESOLVED = "macro_unresolved"
@@ -40,7 +39,15 @@ class UnmappableReason(str, Enum):
     MULTI_SOURCE = "multi_source"
 
 
-class Frequency(str, Enum):
+class Evidence(StrEnum):
+    """Where a lineage edge was derived from."""
+
+    METADATA_MACRO = "metadata_macro"
+    PARSED_SQL = "parsed_sql"
+    LOG_CONFIRMED = "log_confirmed"
+
+
+class Frequency(StrEnum):
     """Inferred run cadence for a SAS job."""
 
     DAILY = "daily"
@@ -61,6 +68,8 @@ class Table:
     path: str
     layer: Layer
     is_remote: bool
+    meta_id: str | None = None
+    is_intermediate: bool = False
 
 
 @dataclass
@@ -81,11 +90,11 @@ class Job:
 
     id: str
     name: str
-    flow_id: Optional[str]
-    frequency: Optional[Frequency]
+    flow_id: str | None
+    frequency: Frequency | None
     frequency_evidence: list[str] = field(default_factory=list)
-    owner: Optional[str] = None
-    domain: Optional[str] = None
+    owner: str | None = None
+    domain: str | None = None
 
 
 @dataclass
@@ -100,9 +109,27 @@ class LineageChain:
     step_name: str
     step_type: StepType
     transformation_logic: str
-    data_type_at_step: Optional[str] = None
-    nullable_at_step: Optional[bool] = None
-    unmappable_reason: Optional[UnmappableReason] = None
+    data_type_at_step: str | None = None
+    nullable_at_step: bool | None = None
+    unmappable_reason: UnmappableReason | None = None
+    evidence: Evidence | None = None
+
+
+@dataclass
+class TableLineage:
+    """A table-level edge (source table → target table) within one step.
+
+    Carries DI-header and SYSLAST derived flow so user-written steps with
+    no column mapping still contribute lineage.
+    """
+
+    id: str
+    source_table_id: str
+    target_table_id: str
+    job_id: str
+    step_name: str
+    transform_type: str
+    evidence: Evidence | None = None
 
 
 @dataclass
@@ -113,7 +140,7 @@ class QualityRule:
     job_id: str
     rule_name: str
     rule_definition: str
-    applies_to_column_id: Optional[str] = None
+    applies_to_column_id: str | None = None
 
 
 @dataclass
@@ -157,6 +184,7 @@ class Provenance:
     columns: list[Column] = field(default_factory=list)
     jobs: list[Job] = field(default_factory=list)
     lineage_chain: list[LineageChain] = field(default_factory=list)
+    table_lineage: list[TableLineage] = field(default_factory=list)
     quality_rules: list[QualityRule] = field(default_factory=list)
     flags: list[Flag] = field(default_factory=list)
     reconciliation: ReconciliationResult = field(

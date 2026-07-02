@@ -19,7 +19,6 @@ _LAYER_HINTS: dict[str, Layer] = {
     "stg": Layer.STG,
     "mart": Layer.MART,
     "mart": Layer.MART,
-    "risk": Layer.ODS,
 }
 
 

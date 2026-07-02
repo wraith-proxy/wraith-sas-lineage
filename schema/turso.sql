@@ -6,13 +6,15 @@ PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS tables (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    libref      TEXT NOT NULL,
-    engine      TEXT NOT NULL,
-    path        TEXT NOT NULL,
-    layer       TEXT NOT NULL CHECK (layer IN ('RAW', 'ODS', 'STG', 'MART')),
-    is_remote   INTEGER NOT NULL DEFAULT 0 CHECK (is_remote IN (0, 1))
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    libref          TEXT NOT NULL,
+    engine          TEXT NOT NULL,
+    path            TEXT NOT NULL,
+    layer           TEXT NOT NULL CHECK (layer IN ('RAW', 'ODS', 'STG', 'MART')),
+    is_remote       INTEGER NOT NULL DEFAULT 0 CHECK (is_remote IN (0, 1)),
+    meta_id         TEXT,
+    is_intermediate INTEGER NOT NULL DEFAULT 0 CHECK (is_intermediate IN (0, 1))
 );
 
 CREATE TABLE IF NOT EXISTS columns (
@@ -54,8 +56,26 @@ CREATE TABLE IF NOT EXISTS lineage_chain (
                                 'macro_unresolved', 'dynamic_column_name',
                                 'hand_written_code', 'remote_execution',
                                 'step_count_mismatch', 'multi_source'
-                            ) OR unmappable_reason IS NULL)
+                            ) OR unmappable_reason IS NULL),
+    evidence                TEXT CHECK (evidence IN (
+                                'metadata_macro', 'parsed_sql', 'log_confirmed'
+                            ) OR evidence IS NULL)
 );
+
+CREATE TABLE IF NOT EXISTS table_lineage (
+    id                  TEXT PRIMARY KEY,
+    source_table_id     TEXT NOT NULL REFERENCES tables(id),
+    target_table_id     TEXT NOT NULL REFERENCES tables(id),
+    job_id              TEXT NOT NULL REFERENCES jobs(id),
+    step_name           TEXT NOT NULL,
+    transform_type      TEXT NOT NULL DEFAULT '',
+    evidence            TEXT CHECK (evidence IN (
+                            'metadata_macro', 'parsed_sql', 'log_confirmed'
+                        ) OR evidence IS NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tl_source ON table_lineage(source_table_id);
+CREATE INDEX IF NOT EXISTS idx_tl_target ON table_lineage(target_table_id);
 
 CREATE INDEX IF NOT EXISTS idx_lc_mart    ON lineage_chain(mart_column_id, chain_order);
 CREATE INDEX IF NOT EXISTS idx_lc_source  ON lineage_chain(source_column_id);

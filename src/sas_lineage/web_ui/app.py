@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import click
 from flask import Flask, g, render_template_string
 
 from sas_lineage.web_ui.db import get_connection
@@ -58,6 +59,20 @@ def create_app(db_path: Path | None = None) -> Flask:
     return app
 
 
-def main() -> None:
-    port = int(os.environ.get("FLASK_PORT", 5000))
-    create_app().run(port=port, debug=True)
+@click.command()
+@click.option(
+    "--db",
+    default=None,
+    type=click.Path(path_type=Path),
+    help="Path to lineage.db (default: DB_PATH env or ./lineage.db).",
+)
+@click.option(
+    "--port",
+    default=None,
+    type=int,
+    help="Port to serve on (default: FLASK_PORT env or 5000).",
+)
+def main(db: Path | None, port: int | None) -> None:
+    """Serve the lineage explorer web UI."""
+    port = port or int(os.environ.get("FLASK_PORT", 5000))
+    create_app(db).run(port=port, debug=True)

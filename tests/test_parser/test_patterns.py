@@ -8,9 +8,9 @@ from sas_lineage.parser import patterns
 
 
 def test_libname_stmt_matches():
-    line = "libname RISKODS BASE '/data/ods/risk';"
+    line = "libname SALESODS BASE '/data/ods/sales';"
     m = patterns.LIBNAME_STMT.search(line)
-    assert m and m.group(1).upper() == "RISKODS"
+    assert m and m.group(1).upper() == "SALESODS"
 
 
 def test_libname_stmt_case_insensitive():
@@ -50,8 +50,8 @@ def test_data_null_matches():
 
 
 def test_data_target_with_libref():
-    m = patterns.DATA_TARGET.search("data RISKODS.ALL_EMP;")
-    assert m and m.group(1).upper() == "RISKODS"
+    m = patterns.DATA_TARGET.search("data SALESODS.ALL_EMP;")
+    assert m and m.group(1).upper() == "SALESODS"
     assert m.group(2).upper() == "ALL_EMP"
 
 
@@ -66,9 +66,9 @@ def test_data_target_no_libref():
 
 
 def test_set_stmt_with_libref():
-    m = patterns.SET_STMT.search("set RISKODS.SOURCE_TABLE;")
+    m = patterns.SET_STMT.search("set SALESODS.SOURCE_TABLE;")
     assert m and m.group(1).lower() == "set"
-    assert "RISKODS.SOURCE_TABLE" in m.group(2)
+    assert "SALESODS.SOURCE_TABLE" in m.group(2)
 
 
 def test_set_stmt_no_libref():
@@ -98,9 +98,9 @@ def test_proc_stmt_extracts_name():
 
 
 def test_sql_create_table():
-    sql = "create table RISKODS.OUTPUT as select * from SOURCE;"
+    sql = "create table SALESODS.OUTPUT as select * from SOURCE;"
     m = patterns.SQL_CREATE_TABLE.search(sql)
-    assert m and m.group(1).upper() == "RISKODS"
+    assert m and m.group(1).upper() == "SALESODS"
     assert m.group(2).upper() == "OUTPUT"
 
 

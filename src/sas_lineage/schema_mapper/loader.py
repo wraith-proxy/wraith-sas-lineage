@@ -54,7 +54,9 @@ class ProvenanceLoader:
 
         for row in data.get("tables", []):
             conn.execute(
-                "INSERT OR REPLACE INTO tables VALUES (?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO tables "
+                "(id, name, libref, engine, path, layer, is_remote, "
+                "meta_id, is_intermediate) VALUES (?,?,?,?,?,?,?,?,?)",
                 (
                     row["id"],
                     row["name"],
@@ -63,6 +65,8 @@ class ProvenanceLoader:
                     row["path"],
                     row["layer"],
                     int(row["is_remote"]),
+                    row.get("meta_id"),
+                    int(row.get("is_intermediate", False)),
                 ),
             )
 
@@ -95,8 +99,11 @@ class ProvenanceLoader:
 
         for row in data.get("lineage_chain", []):
             conn.execute(
-                "INSERT OR REPLACE INTO lineage_chain VALUES "
-                "(?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO lineage_chain "
+                "(id, mart_column_id, source_column_id, chain_order, "
+                "job_id, step_name, step_type, transformation_logic, "
+                "data_type_at_step, nullable_at_step, unmappable_reason, "
+                "evidence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     row["id"],
                     row["mart_column_id"],
@@ -113,6 +120,24 @@ class ProvenanceLoader:
                         else None
                     ),
                     row.get("unmappable_reason"),
+                    row.get("evidence"),
+                ),
+            )
+
+        for row in data.get("table_lineage", []):
+            conn.execute(
+                "INSERT OR REPLACE INTO table_lineage "
+                "(id, source_table_id, target_table_id, job_id, "
+                "step_name, transform_type, evidence) "
+                "VALUES (?,?,?,?,?,?,?)",
+                (
+                    row["id"],
+                    row["source_table_id"],
+                    row["target_table_id"],
+                    row["job_id"],
+                    row["step_name"],
+                    row.get("transform_type", ""),
+                    row.get("evidence"),
                 ),
             )
 

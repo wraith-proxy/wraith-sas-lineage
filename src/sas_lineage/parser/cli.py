@@ -98,6 +98,7 @@ def main(
         "flags_by_reason": dict(
             Counter(f.reason.value for f in provenance.flags)
         ),
+        "row_counts": builder.row_counts,
         "reconciliation": {
             "excel_supplied": provenance.reconciliation.excel_supplied,
             "matches": provenance.reconciliation.matches,

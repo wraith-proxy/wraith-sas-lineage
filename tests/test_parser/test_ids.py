@@ -10,33 +10,33 @@ from sas_lineage.ids import (
 
 
 def test_table_id_format():
-    tid = table_id("RISKODS", "ALL_EMP")
+    tid = table_id("SALESODS", "ALL_EMP")
     assert tid.startswith("tbl_")
     assert len(tid) == len("tbl_") + 12
 
 
 def test_table_id_stable():
-    assert table_id("RISKODS", "ALL_EMP") == table_id("RISKODS", "ALL_EMP")
+    assert table_id("SALESODS", "ALL_EMP") == table_id("SALESODS", "ALL_EMP")
 
 
 def test_table_id_case_insensitive():
-    assert table_id("riskods", "all_emp") == table_id("RISKODS", "ALL_EMP")
+    assert table_id("salesods", "all_emp") == table_id("SALESODS", "ALL_EMP")
 
 
 def test_column_id_format():
-    tid = table_id("RISKODS", "ALL_EMP")
-    cid = column_id(tid, "EXPOSURE_AMT")
+    tid = table_id("SALESODS", "ALL_EMP")
+    cid = column_id(tid, "ORDER_AMT")
     assert cid.startswith("col_")
     assert len(cid) == len("col_") + 12
 
 
 def test_column_id_different_columns():
-    tid = table_id("RISKODS", "ALL_EMP")
-    assert column_id(tid, "EXPOSURE_AMT") != column_id(tid, "ACCOUNT_NO")
+    tid = table_id("SALESODS", "ALL_EMP")
+    assert column_id(tid, "ORDER_AMT") != column_id(tid, "ACCOUNT_NO")
 
 
 def test_job_id_format():
-    jid = job_id("RISK_ODS_LOAD_DAILY")
+    jid = job_id("SALES_ODS_LOAD_DAILY")
     assert jid.startswith("job_")
     assert len(jid) == len("job_") + 12
 
@@ -56,6 +56,6 @@ def test_lineage_chain_id_order_matters():
 
 
 def test_quality_rule_id_format():
-    jid = job_id("RISK_ODS_LOAD")
-    qrid = quality_rule_id(jid, "EXPOSURE_NON_NEGATIVE")
+    jid = job_id("SALES_ODS_LOAD")
+    qrid = quality_rule_id(jid, "AMOUNT_NON_NEGATIVE")
     assert qrid.startswith("qr_")

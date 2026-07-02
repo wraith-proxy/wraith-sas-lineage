@@ -146,10 +146,10 @@ class TestScanTokensIdentForms:
         assert tokens[0].value == "lib.tbl"
 
     def test_dotted_ref_in_context(self):
-        tokens = scan_tokens("select * from RISKODS.SOURCE")
+        tokens = scan_tokens("select * from SALESODS.SOURCE")
         ident_vals = [t.value for t in tokens if t.kind == "ident"]
-        assert "riskods.source" in ident_vals
-        assert "riskods" not in ident_vals
+        assert "salesods.source" in ident_vals
+        assert "salesods" not in ident_vals
         assert "source" not in ident_vals
 
     def test_macro_ref_in_from_clause(self):
@@ -399,17 +399,13 @@ class TestScanTokensDoubledQuoteEscape:
 class TestExtractSqlTablesJoinExtra:
     def test_full_outer_join(self):
         """FULL OUTER JOIN must harvest both tables."""
-        refs = extract_sql_tables(
-            "from A full outer join B on a.k = b.k;"
-        )
+        refs = extract_sql_tables("from A full outer join B on a.k = b.k;")
         names = [r[1] for r in refs]
         assert "A" in names
         assert "B" in names
 
     def test_full_outer_join_with_aliases(self):
-        refs = extract_sql_tables(
-            "from A a full outer join B b on a.k = b.k;"
-        )
+        refs = extract_sql_tables("from A a full outer join B b on a.k = b.k;")
         by_name = {r[1]: r[2] for r in refs}
         assert by_name.get("A") == "a"
         assert by_name.get("B") == "b"

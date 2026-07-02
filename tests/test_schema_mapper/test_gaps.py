@@ -12,7 +12,7 @@ _PROVENANCE = {
             "id": "j2",
             "name": "JOB_WITH_OWNER",
             "owner": "Alice",
-            "domain": "risk",
+            "domain": "sales",
         },
     ],
     "flags": [

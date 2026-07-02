@@ -22,7 +22,7 @@ flowchart TD
     MAP --> ODCS["ODCS contracts\nconsumed by wraith-modelgen"]
     MAP --> GAPS["mapping_gaps.json"]
 
-    DB --> UI["sas-ui\nFlask read-only explorer"]
+    DB --> UI["sas-ui\nFlask lineage explorer"]
 
     UI --> FLAGS["/flags\nall extraction flags"]
     UI --> PROV_VIEW["/provenance?col_id\nupstream chain"]
@@ -133,7 +133,7 @@ flowchart TD
 
 ## Tool 3: Web UI
 
-Read-only Flask app. SQLite connection per request via `g.db`. No write endpoints.
+Local Flask app. SQLite connection per request via `g.db`. No write endpoints.
 
 ```mermaid
 flowchart LR

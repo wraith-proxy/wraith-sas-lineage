@@ -56,9 +56,9 @@ def test_log_value_wins_over_code(tmp_path):
 
 def test_datatype_from_log(tmp_path):
     log = tmp_path / "j.log"
-    log.write_text("1   EXPOSURE_AMT   Num   8\n")
+    log.write_text("1   ORDER_AMT   Num   8\n")
     resolver = LogResolver(log)
-    assert resolver.datatype("EXPOSURE_AMT") == "NUM"
+    assert resolver.datatype("ORDER_AMT") == "NUM"
 
 
 def test_mprint_captured(tmp_path):
@@ -73,7 +73,7 @@ def test_mprint_captured(tmp_path):
 
 def test_libname_db2_captures_database():
     ex = LibnameExtractor()
-    code = "libname DB2LIB DB2 schema=RISK database=PR01;"
+    code = "libname DB2LIB DB2 schema=SALES database=PR01;"
     tables, *_ = ex.extract(code, _NO_LOG, "j", "s")
     assert tables[0].engine == "DB2"
     assert tables[0].path == "PR01"
@@ -81,7 +81,7 @@ def test_libname_db2_captures_database():
 
 def test_libname_slibref_captures_server():
     ex = LibnameExtractor()
-    code = "libname RLIB slibref=RISKODS server=PROD;"
+    code = "libname RLIB slibref=SALESODS server=PROD;"
     tables, *_ = ex.extract(code, _NO_LOG, "j", "s")
     assert tables[0].is_remote
     assert tables[0].path == "PROD"
@@ -134,9 +134,9 @@ def test_builder_applies_log_datatype(tmp_path):
     code_dir.mkdir()
     log_dir.mkdir()
     (code_dir / "j.sas").write_text(
-        "data MART.OUT; set RISKODS.SRC; EXPOSURE = BAL * RATE; run;"
+        "data MART.OUT; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;"
     )
-    (log_dir / "j.log").write_text("1  EXPOSURE  Num  8\n")
+    (log_dir / "j.log").write_text("1  AMOUNT  Num  8\n")
 
     builder = ProvenanceBuilder(code_dir, log_dir, estate="t")
     from sas_lineage.parser.extractors.data_step import DataStepExtractor
@@ -144,8 +144,8 @@ def test_builder_applies_log_datatype(tmp_path):
     builder.register(DataStepExtractor())
     prov = builder.build()
 
-    exposure = next(c for c in prov.columns if c.name == "EXPOSURE")
-    assert exposure.data_type == "NUM"
+    amount = next(c for c in prov.columns if c.name == "AMOUNT")
+    assert amount.data_type == "NUM"
 
 
 # --- MACRO_CALL: flag unknown macros ------------------------------------
@@ -153,9 +153,9 @@ def test_builder_applies_log_datatype(tmp_path):
 
 def test_unknown_macro_flagged():
     ex = MacroCallExtractor()
-    _, _, _, flags = ex.extract("%load_risk(in=A, out=B);", _NO_LOG, "j", "s")
+    _, _, _, flags = ex.extract("%load_sales(in=A, out=B);", _NO_LOG, "j", "s")
     assert flags[0].reason == UnmappableReason.HAND_WRITTEN_CODE
-    assert "load_risk" in flags[0].context
+    assert "load_sales" in flags[0].context
 
 
 def test_sas_builtin_macros_not_flagged():

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 
+from sas_lineage.schema_mapper.diff import generate_diff_report
 from sas_lineage.schema_mapper.enrich import load_owners, load_quality_rules
 from sas_lineage.schema_mapper.gaps import generate_gaps_report
 from sas_lineage.schema_mapper.loader import ProvenanceLoader
@@ -42,6 +43,13 @@ from sas_lineage.schema_mapper.odcs import generate_contract
     help="Path for the gaps report.",
 )
 @click.option(
+    "--diff",
+    default="lineage_diff.json",
+    show_default=True,
+    type=click.Path(path_type=Path),
+    help="Path for the intended-vs-executed lineage diff report.",
+)
+@click.option(
     "--owners",
     default=None,
     type=click.Path(exists=True, path_type=Path),
@@ -58,6 +66,7 @@ def main(
     db: Path,
     contracts_dir: Path,
     gaps: Path,
+    diff: Path,
     owners: Path | None,
     params: Path | None,
 ) -> None:
@@ -115,3 +124,6 @@ def main(
 
     generate_gaps_report(data, gaps)
     click.echo(f"Wrote gaps report: {gaps}")
+
+    generate_diff_report(data, diff)
+    click.echo(f"Wrote lineage diff: {diff}")

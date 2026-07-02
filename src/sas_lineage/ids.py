@@ -25,6 +25,12 @@ def lineage_chain_id(
     return f"lc_{_hash(f'{mart_col_id}.{source_col_id}.{chain_order}')}"
 
 
+def table_lineage_id(
+    source_table_id: str, target_table_id: str, step_name: str
+) -> str:
+    return f"tl_{_hash(f'{source_table_id}.{target_table_id}.{step_name}')}"
+
+
 def quality_rule_id(job_id: str, rule_name: str) -> str:
     return f"qr_{_hash(f'{job_id}.{rule_name}')}"
 

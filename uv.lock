@@ -1470,11 +1470,6 @@ dev = [
     { name = "typer" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "detect-secrets" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1" },
@@ -1498,9 +1493,6 @@ requires-dist = [
     { name = "typer", marker = "extra == 'dev'" },
 ]
 provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "detect-secrets", specifier = ">=1.5.0" }]
 
 [[package]]
 name = "wrapt"
