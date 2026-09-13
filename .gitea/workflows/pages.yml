@@ -39,7 +39,7 @@ jobs:
           git clone https://${MY_TOKEN}@${CLEAN_URL}/thomaspeoples/ghost-site.git main_site
 
           # 2. Create the target directory if it doesn't exist
-          TARGET_DIR="main_site/www/gitea-repos/wraith-sas-lineage"
+          TARGET_DIR="main_site/www/thomaspeoples/gitea-repos/wraith-sas-lineage"
           mkdir -p $TARGET_DIR
 
           # 3. Clean and Copy
