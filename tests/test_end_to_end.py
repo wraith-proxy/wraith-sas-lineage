@@ -20,7 +20,7 @@ data SALESODS.STG;
 run;
 
 proc sql;
-    create table MART.MART as
+    create table MART.SALES_FACT as
     select s.AMOUNT as FINAL_AMT
     from SALESODS.STG s;
 quit;
@@ -104,7 +104,7 @@ def test_full_pipeline_emits_and_renders(tmp_path: Path):
     )
     assert r.exit_code == 0, r.output
 
-    mart_contract = next(contracts.glob("FDP_MART.yml"))
+    mart_contract = next(contracts.glob("MART_SALES_FACT.yml"))
     contract = yaml.safe_load(mart_contract.read_text())
     assert contract["schema"]["columns"], "contract should carry columns"
     assert contract["owner"] == "Sales Team"

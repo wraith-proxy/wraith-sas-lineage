@@ -37,9 +37,9 @@ SAS estate layers map to canonical values throughout the schema:
 
 ```mermaid
 flowchart LR
-    RAW["RAW\n(landing)"] --> ODS["ODS\n(ODS: cleansed)"]
-    ODS --> STG["STG\n(STG: conformed)"]
-    STG --> MART["MART\n(MART: consumption)"]
+    RAW["RAW\n(landing)"] --> ODS["ODS\n(cleansed)"]
+    ODS --> STG["STG\n(conformed)"]
+    STG --> MART["MART\n(consumption)"]
 ```
 
 Lineage chains track column flow from RAW through to MART. The `lineage_chain` table stores one row per source→mart column pair with chain order.

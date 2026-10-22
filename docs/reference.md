@@ -69,7 +69,7 @@ Full JSON Schema at `schema/provenance.schema.json` (draft/2020-12).
 | Field | Type | Description |
 |---|---|---|
 | `id` | `lc_<12hex>` | Content-hashed stable ID |
-| `mart_column_id` | `col_<12hex>` | Terminal MART/MART column |
+| `mart_column_id` | `col_<12hex>` | Terminal MART column |
 | `source_column_id` | `col_<12hex>` | Source column at this hop |
 | `chain_order` | integer | Position in the chain (0 = direct source) |
 | `job_id` | `job_<12hex>` | Job that performs this transformation |

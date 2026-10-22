@@ -105,7 +105,7 @@ def test_build_stitches_multi_step_chain(tmp_path: Path):
     code_dir, log_dir = _make_estate(tmp_path)
     (code_dir / "MART_LOAD.sas").write_text(
         "data SALESODS.STG; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;\n"
-        "proc sql; create table MART.MART as "
+        "proc sql; create table MART.SALES_FACT as "
         "select s.AMOUNT as FINAL_AMT from SALESODS.STG s; quit;\n"
     )
     p = _builder(code_dir, log_dir).build()
@@ -120,7 +120,7 @@ def test_extractor_edges_carry_parsed_sql_evidence(tmp_path: Path):
     code_dir, log_dir = _make_estate(tmp_path)
     (code_dir / "MART_LOAD.sas").write_text(
         "data SALESODS.STG; set SALESODS.SRC; AMOUNT = QTY * PRICE; run;\n"
-        "proc sql; create table MART.MART as "
+        "proc sql; create table MART.SALES_FACT as "
         "select s.AMOUNT as FINAL_AMT from SALESODS.STG s; quit;\n"
     )
     p = _builder(code_dir, log_dir).build()

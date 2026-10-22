@@ -14,10 +14,7 @@ from sas_lineage.parser.log_resolver import LogResolver
 _LAYER_HINTS: dict[str, Layer] = {
     "raw": Layer.RAW,
     "ods": Layer.ODS,
-    "ods": Layer.ODS,
     "stg": Layer.STG,
-    "stg": Layer.STG,
-    "mart": Layer.MART,
     "mart": Layer.MART,
 }
 

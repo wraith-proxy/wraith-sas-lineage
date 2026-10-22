@@ -27,3 +27,8 @@ parse_report.json
 mapping_gaps.json
 contracts/
 lineage_diff.json
+
+# Never publish: local agent state, and SAS code (synthetic test fixtures excepted)
+.claude/
+*.sas
+!tests/**/fixtures/**/*.sas

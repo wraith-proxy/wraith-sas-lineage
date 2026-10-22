@@ -93,9 +93,9 @@ sas-ui --db lineage.db
 | SAS layer | Schema value |
 |---|---|
 | RAW | `RAW` |
-| ODS (ODS) | `ODS` |
-| STG (STG) | `STG` |
-| MART (MART) | `MART` |
+| ODS | `ODS` |
+| STG | `STG` |
+| MART | `MART` |
 
 ---
 
