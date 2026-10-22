@@ -70,6 +70,9 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/sas_lineage"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [".claude", "*.sas"]
+
 [tool.poe.tasks]
 setup = "python tasks.py"
 test = "pytest"
