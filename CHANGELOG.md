@@ -2,6 +2,19 @@
 
 All notable changes to `wraith-sas-lineage` are documented here.
 
+## v0.4.0 (2026-10-22)
+
+### Bug Fixes
+
+- exclude .claude and SAS files from sdist' (#2) from feature/TJP-22101 into main
+- exclude .claude and SAS files from sdist
+- generic layer names ODS/STG/MART, scrub roadmap, gitignore .claude and SAS [skip ci]
+
+### Features
+
+- generic ODS/STG/MART layer model' (#3) from feature/TJP-22101 into main
+- generic ODS/STG/MART layer model
+
 ## v0.3.0 (2026-07-02)
 
 ### Features
