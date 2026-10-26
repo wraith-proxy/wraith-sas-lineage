@@ -2,6 +2,13 @@
 
 All notable changes to `wraith-sas-lineage` are documented here.
 
+## v0.5.0 (2026-10-26)
+
+### Features
+
+- upgrade vulnerable locked dependencies' (#4) from feature/TJP-26101 into main
+- upgrade vulnerable locked dependencies
+
 ## v0.4.0 (2026-10-22)
 
 ### Bug Fixes
