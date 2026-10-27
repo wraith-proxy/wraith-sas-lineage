@@ -2,6 +2,14 @@
 
 All notable changes to `wraith-sas-lineage` are documented here.
 
+## v0.5.1 (2026-10-27)
+
+### Bug Fixes
+
+- override black past upstream pin' (#5) from security/TJP-26101-deps into main
+- override black past upstream pin
+- upgrade locked deps flagged by trivy
+
 ## v0.5.0 (2026-10-26)
 
 ### Features

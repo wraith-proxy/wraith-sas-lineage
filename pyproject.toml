@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "wraith-sas-lineage"
-version = "0.5.0"
+version = "0.5.1"
 description = "SAS lineage extraction, schema mapping, and ODCS contract generation for the Ghost Stack."
 readme = "README.md"
 license = { file = "LICENSE" }
