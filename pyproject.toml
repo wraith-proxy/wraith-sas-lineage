@@ -129,3 +129,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.uv]
+override-dependencies = ["black>=26.10.1"]
